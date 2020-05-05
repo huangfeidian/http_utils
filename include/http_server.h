@@ -110,7 +110,7 @@ protected:
 	
 
 
-	virtual void handle_request_precheck();
+	virtual bool check_request();
 	
 	virtual void route_request();
 
