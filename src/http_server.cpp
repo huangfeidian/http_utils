@@ -61,10 +61,14 @@ void session::on_read(
 		return fail(ec, error_pos::read);
 
 	// Send the response
-	if(check_request())
+	auto check_error = check_request();
+	if (!check_error.empty())
 	{
-		route_request();
+		do_write(create_response::bad_request(check_error, req_));
+		return;
 	}
+
+	route_request();
 }
 
 void session::on_write(
@@ -105,27 +109,25 @@ void session::fail(beast::error_code ec, error_pos where)
 
 
 
-void session::check_request()
+std::string session::check_request()
 {
 	// Make sure we can handle the method
 	if( req_.method() != http::verb::get &&
-		req_.method() != http::verb::head)
-		{
-			do_write(create_response::bad_request("Unknown HTTP-method", req_));
-			return false;
-		}
+		req_.method() != http::verb::head && req_.method() != http::verb::post)
+	{
+		return "Unknown HTTP-method";
+	}
 
 
 	// Request path must be absolute and not contain "..".
 	if( req_.target().empty() ||
 		req_.target()[0] != '/' ||
 		req_.target().find("..") != beast::string_view::npos)
-		{
-			do_write(create_response::bad_request("Illegal request-target", req_));
-			return false;
-		}
+	{
+		return "Illegal request-target";
+	}
 
-	return true;
+	return "";
 	
 }
 void session::route_request()

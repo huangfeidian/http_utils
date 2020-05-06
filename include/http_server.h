@@ -110,7 +110,7 @@ protected:
 	
 
 
-	virtual bool check_request();
+	virtual std::string check_request();
 	
 	virtual void route_request();
 

@@ -76,7 +76,7 @@ http::response<http::string_body> create_response::bad_request(beast::string_vie
 	res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
 	res.set(http::field::content_type, "text/html");
 	res.keep_alive(req.keep_alive());
-	res.body() = std::string(why);
+	res.body() = std::string(why) + "\ntarget is" + std::string(req.target()) + " data is " + req.body();
 	res.prepare_payload();
 	return res;
 }

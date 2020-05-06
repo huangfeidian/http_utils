@@ -121,7 +121,7 @@ namespace spiritsaway::http_utils::ssl_server
 
 
 
-		virtual bool check_request();
+		virtual std::string check_request();
 		virtual void route_request();
 
 	};
