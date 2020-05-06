@@ -52,7 +52,8 @@ namespace spiritsaway::http_utils::ssl_server
 		beast::ssl_stream<beast::tcp_stream> stream_;
 		beast::flat_buffer buffer_;
 		http::request<http::string_body> req_;
-		std::shared_ptr<void> res_;
+		std::shared_ptr<http::response<http::string_body>> string_res_;
+		std::shared_ptr<http::response<http::file_body>> file_res_;
 		logger_t logger;
 		const std::uint32_t expire_time;
 
@@ -83,35 +84,12 @@ namespace spiritsaway::http_utils::ssl_server
 			beast::error_code ec,
 			std::size_t bytes_transferred);
 
-		template<bool isRequest, class Body, class Fields>
-		void do_write(http::message<isRequest, Body, Fields>&& msg)
-		{
-			// The lifetime of the message has to extend
-			// for the duration of the async operation so
-			// we use a shared_ptr to manage it.
-			auto sp = std::make_shared<
-				http::message<isRequest, Body, Fields>>(std::move(msg));
+		void do_write(http::response<http::string_body>&& msg);
+		void do_write(http::response<http::file_body>&& msg);
 
-			// Store a type-erased version of the shared
-			// pointer in the class to keep it alive.
-			res_ = sp;
+		virtual void on_write(beast::error_code ec, std::size_t bytes_transferred);
 
-			// Write the response
-			beast::get_lowest_layer(stream_).expires_after(
-				std::chrono::seconds(expire_time));
-
-			http::async_write(
-				stream_,
-				*sp,
-				beast::bind_front_handler
-				(
-					&session::on_write,
-					shared_from_this(),
-					sp->need_eof()
-				)
-			);
-		}
-		void on_write(bool close, beast::error_code ec, std::size_t bytes_transferred);
+		virtual bool should_close() const;
 
 		void do_close();
 

@@ -70,9 +70,43 @@ void session::on_read(
 
 	route_request();
 }
+void session::do_write(http::response<http::string_body>&& msg)
+{
+	// The lifetime of the message has to extend
+	// for the duration of the async operation so
+	// we use a shared_ptr to manage it.
+	string_res_ = std::make_shared<http::response<http::string_body>>(std::move(msg));
+
+
+	// Write the response
+	beast::get_lowest_layer(stream_).expires_after(
+		std::chrono::seconds(expire_time));
+	auto write_callback = [self = shared_from_this()](beast::error_code ec, std::size_t bytes_transferred)
+	{
+		return self->on_write(ec, bytes_transferred);
+	};
+	http::async_write(stream_, *string_res_, write_callback);
+}
+
+void session::do_write(http::response<http::file_body>&& msg)
+{
+	// The lifetime of the message has to extend
+	// for the duration of the async operation so
+	// we use a shared_ptr to manage it.
+	file_res_ = std::make_shared<http::response<http::file_body>>(std::move(msg));
+
+
+	// Write the response
+	beast::get_lowest_layer(stream_).expires_after(
+		std::chrono::seconds(expire_time));
+	auto write_callback = [self = shared_from_this()](beast::error_code ec, std::size_t bytes_transferred)
+	{
+		return self->on_write(ec, bytes_transferred);
+	};
+	http::async_write(stream_, *file_res_, write_callback);
+}
 
 void session::on_write(
-	bool close,
 	beast::error_code ec,
 	std::size_t bytes_transferred)
 {
@@ -81,7 +115,7 @@ void session::on_write(
 	if (ec)
 		return fail(ec, error_pos::write);
 
-	if (close)
+	if (should_close())
 	{
 		// This means we should close the connection, usually because
 		// the response indicated the "Connection: close" semantic.
@@ -89,14 +123,30 @@ void session::on_write(
 	}
 
 	// We're done with the response so delete it
-	res_ = nullptr;
+	string_res_ = nullptr;
+	file_res_ = nullptr;
 
 	// Read another request
 	do_read();
 }
 
+bool session::should_close() const
+{
+	if (file_res_)
+	{
+		return true;
+	}
+	if (string_res_ && string_res_->need_eof())
+	{
+		return false;
+	}
+	return true;
+}
 void session::do_close()
 {
+	string_res_ = nullptr;
+	file_res_ = nullptr;
+
 	beast::error_code ec;
 	stream_.socket().shutdown(tcp::socket::shutdown_send, ec);
 
@@ -104,7 +154,7 @@ void session::do_close()
 // Report a failure
 void session::fail(beast::error_code ec, error_pos where)
 {
-	logger->info("fail in https server session ec is {} where is {}", ec.message(), magic_enum::enum_name(where));
+	logger->info("fail in http server session ec is {} where is {}", ec.message(), magic_enum::enum_name(where));
 }
 
 
@@ -162,7 +212,7 @@ void file_session::route_request()
 	// Respond to HEAD request
 	if(req_.method() == http::verb::head)
 	{
-		http::response<http::empty_body> res{http::status::ok, req_.version()};
+		http::response<http::string_body> res{http::status::ok, req_.version()};
 		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
 		res.set(http::field::content_type, create_response::mime_type(path));
 		res.content_length(size);
