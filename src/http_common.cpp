@@ -34,6 +34,7 @@ http::request<http::string_body> create_request::create(const request_data& orig
 	{
 		dest_request.body() = origin_req.data;
 	}
+	dest_request.prepare_payload();
 	return dest_request;
 }
 

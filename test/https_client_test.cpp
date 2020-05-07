@@ -3,6 +3,8 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/fmt/ostr.h>
 #include <fstream>
+#include <boost/asio/ssl.hpp>
+
 using namespace spiritsaway::http_utils;
 using namespace std;
 namespace beast = boost::beast;         // from <boost/beast.hpp>
@@ -25,6 +27,41 @@ std::shared_ptr<spdlog::logger> create_logger(const std::string& name)
 	return logger;
 }
 
+///@brief Helper class that prints the current certificate's subject
+///       name and the verification results.
+template <typename Verifier>
+class verbose_verification
+{
+public:
+	verbose_verification(Verifier verifier)
+		: verifier_(verifier)
+	{}
+
+	bool operator()(
+		bool preverified,
+		boost::asio::ssl::verify_context& ctx
+		)
+	{
+		char subject_name[256];
+		X509* cert = X509_STORE_CTX_get_current_cert(ctx.native_handle());
+		X509_NAME_oneline(X509_get_subject_name(cert), subject_name, 256);
+		bool verified = verifier_(preverified, ctx);
+		std::cout << "Verifying: " << subject_name << "\n"
+			"Verified: " << verified << std::endl;
+		return verified;
+	}
+private:
+	Verifier verifier_;
+};
+
+///@brief Auxiliary function to make verbose_verification objects.
+template <typename Verifier>
+verbose_verification<Verifier>
+make_verbose_verification(Verifier verifier)
+{
+	return verbose_verification<Verifier>(verifier);
+}
+
 int main()
 {
 	// The io_context is required for all I/O
@@ -32,8 +69,8 @@ int main()
 
 	// Launch the asynchronous operation
 	common::request_data cur_request;
-	//cur_request.host = "cn.bing.com";
-	cur_request.host = "127.0.0.1";
+	cur_request.host = "www.zhihu.com";
+	//cur_request.host = "127.0.0.1";
 	cur_request.port = "443";
 	cur_request.target = "/";
 	cur_request.version = common::http_version::v1_1;
@@ -54,22 +91,24 @@ int main()
 		}
 	};
 	ssl::context ctx{ ssl::context::tlsv12_client };
-	//ctx.set_default_verify_paths();
-	ctx.load_verify_file("../data/keys/server.crt");
+	ctx.set_default_verify_paths();
+	//ctx.load_verify_file("../data/keys/server.crt");
 	ctx.set_verify_mode(ssl::verify_peer);
-	ctx.set_verify_callback(
-		[=](bool v, boost::asio::ssl::verify_context &ctx) -> bool
-	{
-		if (v)
-			return true;
-		X509_STORE_CTX *sctx = ctx.native_handle();
-		int error = X509_STORE_CTX_get_error(sctx);
-		char name[256];
-		X509* cert = X509_STORE_CTX_get_current_cert(sctx);
-		X509_NAME_oneline(X509_get_subject_name(cert), name, 256);
-		cur_logger->info("verify_callback.untrusted ca ({}) error = {} preverify {}", name, error, v);
-		return v;
-	});
+	//ctx.set_verify_callback(
+	//	[=](bool v, boost::asio::ssl::verify_context &ctx) -> bool
+	//{
+	//	if (v)
+	//		return true;
+	//	X509_STORE_CTX *sctx = ctx.native_handle();
+	//	int error = X509_STORE_CTX_get_error(sctx);
+	//	char name[256];
+	//	X509* cert = X509_STORE_CTX_get_current_cert(sctx);
+	//	X509_NAME_oneline(X509_get_subject_name(cert), name, 256);
+	//	cur_logger->info("verify_callback.untrusted ca ({}) error = {} preverify {}", name, error, v);
+	//	return v;
+	//});
+	ctx.set_verify_callback(make_verbose_verification(
+		boost::asio::ssl::rfc2818_verification(cur_request.host)));;
 	auto cur_callback = std::make_shared<common::callback_t>(result_lambda);
 	auto cur_session = std::make_shared<ssl_client::session>(ioc, ctx, cur_request, cur_logger, cur_callback, 10);
 	//cur_callback = std::shared_ptr<common::callback_t>();
