@@ -37,7 +37,7 @@ int main()
 	cur_request.version = common::http_version::v1_1;
 	cur_request.method = http::verb::get;
 	auto cur_logger = create_logger("client");
-	auto result_lambda = [=](common::error_pos ec, const const http::response<http::string_body>& response)
+	auto result_lambda = [=](common::error_pos ec, const http::response<http::string_body>& response)
 	{
 		if (ec != common::error_pos::ok)
 		{

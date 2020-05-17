@@ -30,7 +30,6 @@ void session::run()
 	}
 
 	// Look up the domain name
-	logger->debug("resolve {}:{}", origin_req.host, origin_req.port);
 	resolver_.async_resolve(
 		origin_req.host,
 		origin_req.port,
@@ -64,7 +63,6 @@ void session::on_connect(beast::error_code ec, tcp::resolver::results_type::endp
 	// Send the HTTP request to the remote host
 	beast::get_lowest_layer(stream_).expires_after(
 			std::chrono::seconds(expire_time));
-	logger->debug("send request {}", req_);
 	http::async_write(stream_, req_,
 		beast::bind_front_handler(
 			&session::on_write,
@@ -76,7 +74,6 @@ void session::on_write(
 	std::size_t bytes_transferred)
 {
 	boost::ignore_unused(bytes_transferred);
-	logger->debug("write bytes {}", bytes_transferred);
 	if (ec)
 		return fail(ec, error_pos::write);
 
@@ -111,7 +108,6 @@ void session::fail(beast::error_code ec, error_pos where)
 }
 void session::invoke_callback(error_pos ec)
 {
-	logger->debug("invoke callback");
 	auto cur_callback_ptr = callback.lock();
 	callback.reset();
 	if(!cur_callback_ptr)
