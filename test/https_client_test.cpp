@@ -4,7 +4,6 @@
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/logger.h>
 #include <fstream>
-#include <wincrypt.h>
 
 using namespace spiritsaway::http_utils;
 using namespace std;
