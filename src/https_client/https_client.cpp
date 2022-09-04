@@ -104,7 +104,6 @@ namespace spiritsaway::http_utils
 		{
 			if (err == asio::error::eof)
 			{
-				m_reply.content = reply_oss.str();
 				invoke_callback("");
 			}
 			else
@@ -130,7 +129,7 @@ namespace spiritsaway::http_utils
 	void https_client::invoke_callback(const std::string& err)
 	{
 		m_timer.cancel();
-		m_callback(err, m_reply);
+		m_callback(err, m_rep_parser.m_reply);
 		asio::error_code ignore_ec;
 		m_socket.lowest_layer().close(ignore_ec);
 

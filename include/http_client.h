@@ -21,7 +21,6 @@ namespace spiritsaway::http_utils
 		const std::string m_server_port;
 		std::string m_header_read_buffer;
 		std::array<char, 4096> m_content_read_buffer;
-		reply m_reply;
 		std::ostringstream reply_oss;
 		// timeout timer
 		asio::basic_waitable_timer<std::chrono::steady_clock> m_timer;

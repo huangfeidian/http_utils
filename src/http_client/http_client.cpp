@@ -21,11 +21,11 @@ namespace spiritsaway::http_utils
 		asio::ip::tcp::resolver::query query(m_server_url, m_server_port);
 		m_resolver.async_resolve(query, [self, this](const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)
 								{ handle_resolve(error, iterator); });
-		m_timer.expires_from_now(std::chrono::seconds(m_timeout_seconds));
+		/*m_timer.expires_from_now(std::chrono::seconds(m_timeout_seconds));
 		m_timer.async_wait([self, this](const asio::error_code& error)
 		{
 			on_timeout(error);
-		});
+		});*/
 	}
 
 	void http_client::handle_resolve(const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)
@@ -74,7 +74,6 @@ namespace spiritsaway::http_utils
 		{
 			if(err == asio::error::eof)
 			{
-				m_reply.content = reply_oss.str();
 				invoke_callback("");
 			}
 			else
@@ -83,7 +82,7 @@ namespace spiritsaway::http_utils
 			}
 			return;
 		}
-		std::string temp_content(m_content_read_buffer.data(), n);
+		// std::string temp_content(m_content_read_buffer.data(), n);
 		// std::cout << "read content: " << temp_content << std::endl;
 		auto temp_parse_result = m_rep_parser.parse(m_content_read_buffer.data(), n);
 		if (temp_parse_result == http_reply_parser::result_type::bad)
@@ -100,7 +99,7 @@ namespace spiritsaway::http_utils
 	void http_client::invoke_callback(const std::string& err)
 	{
 		m_timer.cancel();
-		m_callback(err, m_reply);
+		m_callback(err, m_rep_parser.m_reply);
 		m_socket.close();
 
 	}

@@ -20,7 +20,7 @@ int main()
 		cur_req.method = "GET";
 		cur_req.http_version_major = 1;
 		cur_req.http_version_minor = 1;
-		std::string address = "192.168.1.1";
+		std::string address = "www.baidu.com";
 		std::string port = "80";
 		auto cur_client = std::make_shared<http_client>(cur_context, address, port, cur_req, cur_lambda, 5);
 
