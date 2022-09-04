@@ -1,67 +1,55 @@
-﻿#include <http_server.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/sinks/basic_file_sink.h>
-#include <spdlog/fmt/ostr.h>
-
-namespace beast = boost::beast;         // from <boost/beast.hpp>
-namespace http = beast::http;           // from <boost/beast/http.hpp>
-namespace net = boost::asio;            // from <boost/asio.hpp>
-using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
+﻿#include "http_server.h"
+#include <iostream>
 using namespace spiritsaway::http_utils;
-std::shared_ptr<spdlog::logger> create_logger(const std::string& name)
+using namespace std;
+
+
+
+int main()
 {
-	auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-	console_sink->set_level(spdlog::level::debug);
-	std::string pattern = "[" + name + "] [%^%l%$] %v";
-	console_sink->set_pattern(pattern);
+	asio::io_context cur_context;
 
-	auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(name + ".log", true);
-	file_sink->set_level(spdlog::level::trace);
-	auto logger = std::make_shared<spdlog::logger>(name, spdlog::sinks_init_list{ console_sink, file_sink });
-	logger->set_level(spdlog::level::trace);
-	return logger;
-}
-
-int main(int argc, char* argv[])
-{
-	// Check command line arguments.
-	//if (argc != 5)
-	//{
-	//	std::cerr <<
-	//		"Usage: http-server-async <address> <port> <doc_root> <threads>\n" <<
-	//		"Example:\n" <<
-	//		"    http-server-async 0.0.0.0 8080 . 1\n";
-	//	return EXIT_FAILURE;
-	//}
-	std::string address_str = "127.0.0.1";
-	std::uint16_t port = 8080;
-	auto const address = net::ip::make_address(address_str);
-	std::string const doc_root = "../data/server/";
-	std::uint8_t const threads = 2;
-	std::uint32_t expire_time = 10;
-	// The io_context is required for all I/O
-	net::io_context ioc{ threads };
-	auto cur_logger = create_logger("server");
-	// Create and launch a listening port
-	auto cur_listener = std::make_shared<server::file_listener>(
-		ioc,
-		tcp::endpoint{ address, port },
-		cur_logger,
-		expire_time,
-		doc_root);
-
-	cur_listener->run();
-
-	// Run the I/O service on the requested number of threads
-	std::vector<std::thread> v;
-	v.reserve(threads - 1);
-	for (auto i = threads - 1; i > 0; --i)
-		v.emplace_back(
-			[&ioc]
+	try
 	{
-		ioc.run();
-	});
-	ioc.run();
+		// Check command line arguments.
+		//if (argc != 2)
+		//{
+		//  std::cerr << "Usage: http_server <port>\n";
+		//  return 1;
+		//}
 
-	return EXIT_SUCCESS;
+		// Initialise the server.
+		request_handler echo_handler_ins = [](std::weak_ptr< request> weak_req, reply_handler cb)
+		{
+			auto req_ptr = weak_req.lock();
+			if (!req_ptr)
+			{
+				return;
+			}
+			auto& req = *req_ptr;
+			reply rep;
+			// Fill out the reply to be sent to the client.
+			rep.status_code = 200;
+			rep.content = "echo request uri: " + req.uri + " body: " + req.body;
+			rep.headers.resize(2);
+			rep.headers[0].name = "Content-Length";
+			rep.headers[0].value = std::to_string(rep.content.size());
+			rep.headers[1].name = "Content-Type";
+			rep.headers[1].value = "text";
+			cb(rep);
+		};
+		std::string address = "127.0.0.1";
+		std::string port = "8080";
+		http_server s(cur_context, address, port, echo_handler_ins);
+
+		// Run the server until stopped.
+		s.run();
+		cur_context.run();
+	}
+	catch (std::exception& e)
+	{
+		std::cerr << "exception: " << e.what() << "\n";
+	}
+
+	return 0;
 }

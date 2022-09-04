@@ -1,64 +1,37 @@
-﻿#include <http_client.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/sinks/basic_file_sink.h>
-#include <spdlog/fmt/ostr.h>
-#include <fstream>
+﻿#include "http_client.h"
+#include <iostream>
 using namespace spiritsaway::http_utils;
 using namespace std;
-namespace beast = boost::beast;         // from <boost/beast.hpp>
-namespace http = beast::http;           // from <boost/beast/http.hpp>
-namespace net = boost::asio;            // from <boost/asio.hpp>
-using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
-std::shared_ptr<spdlog::logger> create_logger(const std::string& name)
-{
-	auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-	console_sink->set_level(spdlog::level::debug);
-	std::string pattern = "[" + name + "] [%^%l%$] %v";
-	console_sink->set_pattern(pattern);
 
-	auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(name + ".log", true);
-	file_sink->set_level(spdlog::level::trace);
-	auto logger = std::make_shared<spdlog::logger>(name, spdlog::sinks_init_list{ console_sink, file_sink });
-	logger->set_level(spdlog::level::trace);
-	return logger;
-}
 
 int main()
 {
-	// The io_context is required for all I/O
-	net::io_context ioc;
+	asio::io_context cur_context;
 
-	// Launch the asynchronous operation
-	common::request_data cur_request;
-	cur_request.host = "127.0.0.1";
-	cur_request.port = "8080";
-	cur_request.target = "/";
-	cur_request.version = common::http_version::v1_1;
-	cur_request.method = http::verb::get;
-	auto cur_logger = create_logger("client");
-	auto result_lambda = [=](common::error_pos ec, const http::response<http::string_body>& response)
+	try
 	{
-		if (ec != common::error_pos::ok)
+		auto cur_lambda = [](const std::string& err, const reply& rep)
 		{
-			cur_logger->info("request error {}", magic_enum::enum_name(ec));
-		}
-		else
-		{
-			cur_logger->info("request suc result write to file");
-			std::ofstream output("../data/client/result.txt");
-			output << response << endl;
-			output.close();
-		}
-	};
-	auto cur_callback = std::make_shared<common::callback_t>(result_lambda);
-	auto cur_session = std::make_shared<client::session>(ioc, cur_request, cur_logger, cur_callback, 10);
-	//cur_callback = std::shared_ptr<common::callback_t>();
-	cur_session->run();
+			std::cout << "err is " << err << " status is " << rep.status_code << " content is " << rep.content << std::endl;
+		};
+		request cur_req;
+		cur_req.uri = "/";
+		cur_req.method = "GET";
+		cur_req.http_version_major = 1;
+		cur_req.http_version_minor = 1;
+		std::string address = "192.168.1.1";
+		std::string port = "80";
+		auto cur_client = std::make_shared<http_client>(cur_context, address, port, cur_req, cur_lambda, 5);
 
-	// Run the I/O service. The call will return when
-	// the get operation is complete.
-	ioc.run();
+		// Run the server until stopped.
+		cur_client->run();
+		cur_context.run();
+	}
+	catch (std::exception& e)
+	{
+		std::cerr << "exception: " << e.what() << "\n";
+	}
 
-	return EXIT_SUCCESS;
+	return 0;
 }

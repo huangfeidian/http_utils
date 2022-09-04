@@ -2,16 +2,13 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/fmt/ostr.h>
+#include <spdlog/logger.h>
 #include <fstream>
-#include <boost/asio/ssl.hpp>
+#include <wincrypt.h>
 
 using namespace spiritsaway::http_utils;
 using namespace std;
-namespace beast = boost::beast;         // from <boost/beast.hpp>
-namespace http = beast::http;           // from <boost/beast/http.hpp>
-namespace net = boost::asio;            // from <boost/asio.hpp>
-using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
-namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
+
 
 std::shared_ptr<spdlog::logger> create_logger(const std::string& name)
 {
@@ -39,7 +36,7 @@ public:
 
 	bool operator()(
 		bool preverified,
-		boost::asio::ssl::verify_context& ctx
+		asio::ssl::verify_context& ctx
 		)
 	{
 		char subject_name[256];
@@ -62,60 +59,36 @@ make_verbose_verification(Verifier verifier)
 	return verbose_verification<Verifier>(verifier);
 }
 
+
+
 int main()
 {
+	request cur_req;
+	cur_req.uri = "/";
+	cur_req.method = "GET";
+	cur_req.http_version_major = 1;
+	cur_req.http_version_minor = 1;
+	std::string address = "www.baidu.com";
+	std::string port = "443";
 	// The io_context is required for all I/O
-	net::io_context ioc;
-
-	// Launch the asynchronous operation
-	common::request_data cur_request;
-	cur_request.host = "www.zhihu.com";
-	//cur_request.host = "127.0.0.1";
-	cur_request.port = "443";
-	cur_request.target = "/";
-	cur_request.version = common::http_version::v1_1;
-	cur_request.method = http::verb::get;
-	auto cur_logger = create_logger("client_ssl");
-	auto result_lambda = [=](common::error_pos ec, const http::response<http::string_body>& response)
-	{
-		if (ec != common::error_pos::ok)
-		{
-			cur_logger->info("request error {}", magic_enum::enum_name(ec));
-		}
-		else
-		{
-			cur_logger->info("request suc result write to file");
-			std::ofstream output("../data/client/result_ssl.txt");
-			output << response << endl;
-			output.close();
-		}
-	};
-	ssl::context ctx{ ssl::context::tlsv12_client };
+	asio::io_context ioc;
+	asio::ssl::context ctx{ asio::ssl::context::sslv23 };
 	ctx.set_default_verify_paths();
 	//ctx.load_verify_file("../data/keys/server.crt");
-	ctx.set_verify_mode(ssl::verify_peer);
-	//ctx.set_verify_callback(
-	//	[=](bool v, boost::asio::ssl::verify_context &ctx) -> bool
-	//{
-	//	if (v)
-	//		return true;
-	//	X509_STORE_CTX *sctx = ctx.native_handle();
-	//	int error = X509_STORE_CTX_get_error(sctx);
-	//	char name[256];
-	//	X509* cert = X509_STORE_CTX_get_current_cert(sctx);
-	//	X509_NAME_oneline(X509_get_subject_name(cert), name, 256);
-	//	cur_logger->info("verify_callback.untrusted ca ({}) error = {} preverify {}", name, error, v);
-	//	return v;
-	//});
+	ctx.set_verify_mode(asio::ssl::verify_peer);
 	ctx.set_verify_callback(make_verbose_verification(
-		boost::asio::ssl::rfc2818_verification(cur_request.host)));;
-	auto cur_callback = std::make_shared<common::callback_t>(result_lambda);
-	auto cur_session = std::make_shared<ssl_client::session>(ioc, ctx, cur_request, cur_logger, cur_callback, 10);
-	//cur_callback = std::shared_ptr<common::callback_t>();
-	cur_session->run();
+		asio::ssl::rfc2818_verification(address)));;
 
-	// Run the I/O service. The call will return when
-	// the get operation is complete.
+	//cur_request.host = "127.0.0.1";
+	auto cur_lambda = [](const std::string& err, const reply& rep)
+	{
+		std::cout << "err is " << err << " status is " << rep.status_code << " content is " << rep.content << std::endl;
+	};
+
+	auto cur_client = std::make_shared<https_client>(ioc,ctx, address, port, cur_req, cur_lambda, 5);
+
+	// Run the server until stopped.
+	cur_client->run();
 	ioc.run();
 
 	return EXIT_SUCCESS;

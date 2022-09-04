@@ -1,72 +1,43 @@
 ﻿#pragma once
 
-#include <spdlog/spdlog.h>
-
-#include <magic_enum.hpp>
-
-#include <boost/beast/core.hpp>
-#include <boost/beast/http.hpp>
-#include <boost/beast/version.hpp>
-#include <boost/asio/strand.hpp>
-#include <cstdlib>
-#include <functional>
-#include <iostream>
+#include "http_packet.h"
 #include <memory>
-#include <string>
+#include <iostream>
+#include <istream>
+#include <ostream>
+#include <asio.hpp>
+#include "http_reply_parser.h"
 
-
-#include "http_common.h"
-
-namespace spiritsaway::http_utils::client
+namespace spiritsaway::http_utils
 {
+	class http_client : public std::enable_shared_from_this<http_client>
+	{
+	private:
+		asio::ip::tcp::resolver m_resolver;
+		asio::ip::tcp::socket m_socket;
+		std::function<void(const std::string &, const reply &)> m_callback;
+		const std::string m_req_str;
+		const std::string m_server_url;
+		const std::string m_server_port;
+		std::string m_header_read_buffer;
+		std::array<char, 4096> m_content_read_buffer;
+		reply m_reply;
+		std::ostringstream reply_oss;
+		// timeout timer
+		asio::basic_waitable_timer<std::chrono::steady_clock> m_timer;
+		const std::size_t m_timeout_seconds = 5;
+		http_reply_parser m_rep_parser;
 
-namespace beast = boost::beast;   // from <boost/beast.hpp>
-namespace http = beast::http;     // from <boost/beast/http.hpp>
-namespace net = boost::asio;      // from <boost/asio.hpp>
-using tcp = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
-using logger_t = std::shared_ptr<spdlog::logger>;
-using request_data_t = spiritsaway::http_utils::common::request_data;
-using spiritsaway::http_utils::common::callback_t;
-using spiritsaway::http_utils::common::error_pos;
+	public:
+		http_client(asio::io_context &io_context, const std::string &server_url, const std::string &server_port, const request &req, std::function<void(const std::string &, const reply &)> callback, std::uint32_t timeout_second);
+		void run();
 
-//------------------------------------------------------------------------------
-
-class session : public std::enable_shared_from_this<session>
-{
-	tcp::resolver resolver_;
-	beast::tcp_stream stream_;
-	beast::flat_buffer buffer_; // (Must persist between reads)
-	http::request<http::string_body> req_;
-
-	http::response<http::string_body> res_;
-	request_data_t origin_req;
-	const std::uint32_t expire_time;
-	std::weak_ptr<callback_t> callback;
-	logger_t logger;
-
-
-public:
-	explicit session(
-		net::io_context& ioc,
-		request_data_t in_request_data,
-		logger_t in_logger,
-		std::weak_ptr<callback_t> in_callback,
-		std::uint32_t in_expire_time);
-
-	// Start the asynchronous operation
-	virtual void run();
-	
-
-protected:
-	void on_resolve(beast::error_code ec, tcp::resolver::results_type results);
-
-	void on_connect(beast::error_code ec, tcp::resolver::results_type::endpoint_type);
-
-	void on_write(beast::error_code ec, std::size_t bytes_transferred);
-
-	void on_read(beast::error_code ec, std::size_t bytes_transferred);
-
-	virtual void fail(beast::error_code ec, error_pos where);
-	void invoke_callback(error_pos ec);
-};
-} // namespace spiritsaway::http_utils::client
+	private:
+		void handle_resolve(const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator);
+		void handle_connect(const asio::error_code &err);
+		void handle_write_request(const asio::error_code &err);
+		void handle_read_content(const asio::error_code &err, std::size_t n);
+		void invoke_callback(const std::string &err);
+		void on_timeout(const asio::error_code &err);
+	};
+}
