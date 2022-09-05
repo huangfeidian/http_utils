@@ -7,6 +7,7 @@
 #include <asio/ssl.hpp>
 #include "http_request_parser.h"
 #include "http_session_manager.h"
+#include <spdlog/logger.h>
 
 namespace spiritsaway::http_utils
 {
@@ -19,7 +20,7 @@ namespace spiritsaway::http_utils
 		https_server_session &operator=(const https_server_session &) = delete;
 
 		/// Construct a https_server_session with the given socket.
-		explicit https_server_session(asio::ssl::stream<asio::ip::tcp::socket> socket, http_session_manager<https_server_session>& session_mgr, const request_handler &handler);
+		explicit https_server_session(asio::ssl::stream<asio::ip::tcp::socket> socket, std::shared_ptr<spdlog::logger> in_logger, std::uint64_t in_session_idx, http_session_manager<https_server_session>& session_mgr, const request_handler &handler);
 
 		/// Start the first asynchronous operation for the https_server_session.
 		void start();
@@ -41,7 +42,7 @@ namespace spiritsaway::http_utils
 		void on_timeout();
 
 		/// Socket for the https_server_session.
-		asio::ssl::stream<asio::ip::tcp::socket> socket_;
+		asio::ssl::stream<asio::ip::tcp::socket> m_socket;
 
 		/// The manager for this https_server_session.
 
@@ -49,10 +50,10 @@ namespace spiritsaway::http_utils
 		const request_handler m_request_handler;
 
 		/// Buffer for incoming data.
-		std::array<char, 8192> buffer_;
+		std::array<char, 8192> m_buffer;
 
 		/// The incoming request.
-		std::shared_ptr<request> request_;
+		std::shared_ptr<request> m_request;
 
 		/// The parser for the incoming request.
 		http_request_parser m_request_parser;
@@ -60,13 +61,15 @@ namespace spiritsaway::http_utils
 		http_session_manager<https_server_session>& m_session_mgr;
 
 		/// The reply to be sent back to the client.
-		reply reply_;
+		reply m_reply;
 
 		std::string m_reply_str;
 
 		// timeout timer
-		asio::basic_waitable_timer<std::chrono::steady_clock> con_timer_;
-		const std::size_t timeout_seconds_ = 5;
+		asio::basic_waitable_timer<std::chrono::steady_clock> m_con_timer;
+		const std::size_t m_timeout_seconds = 5;
+		std::shared_ptr<spdlog::logger> m_logger;
+		const std::uint64_t m_session_idx;
 	};
 
 	typedef std::shared_ptr<https_server_session> https_server_session_ptr;

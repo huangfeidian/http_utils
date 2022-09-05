@@ -3,13 +3,14 @@
 
 namespace spiritsaway::http_utils
 {
-	http_client::http_client(asio::io_context &io_context, const std::string &server_url, const std::string &server_port, const request &req, std::function<void(const std::string &, const reply &)> callback, std::uint32_t timeout_second)
+	http_client::http_client(asio::io_context &io_context, std::shared_ptr<spdlog::logger> in_logger, const std::string &server_url, const std::string &server_port, const request &req, std::function<void(const std::string &, const reply &)> callback, std::uint32_t timeout_second)
 		: m_socket(io_context), m_resolver(io_context), m_callback(callback)
 		, m_req_str(req.to_string(server_url, server_port))
 		, m_timer(io_context)
 		, m_timeout_seconds(timeout_second)
 		, m_server_url(server_url)
 		, m_server_port(server_port)
+		, m_logger(in_logger)
 	{
 		
 
@@ -21,11 +22,11 @@ namespace spiritsaway::http_utils
 		asio::ip::tcp::resolver::query query(m_server_url, m_server_port);
 		m_resolver.async_resolve(query, [self, this](const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)
 								{ handle_resolve(error, iterator); });
-		/*m_timer.expires_from_now(std::chrono::seconds(m_timeout_seconds));
+		m_timer.expires_from_now(std::chrono::seconds(m_timeout_seconds));
 		m_timer.async_wait([self, this](const asio::error_code& error)
 		{
 			on_timeout(error);
-		});*/
+		});
 	}
 
 	void http_client::handle_resolve(const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)
@@ -82,8 +83,8 @@ namespace spiritsaway::http_utils
 			}
 			return;
 		}
-		// std::string temp_content(m_content_read_buffer.data(), n);
-		// std::cout << "read content: " << temp_content << std::endl;
+
+		m_logger->trace("read content: {}", std::string_view(m_content_read_buffer.data(), n));
 		auto temp_parse_result = m_rep_parser.parse(m_content_read_buffer.data(), n);
 		if (temp_parse_result == http_reply_parser::result_type::bad)
 		{

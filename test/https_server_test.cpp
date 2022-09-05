@@ -49,25 +49,33 @@ int main(int argc, char* argv[])
 		rep.headers[1].value = "text";
 		cb(rep);
 	};
+	auto cur_logger = create_logger("https_server");
+	try
+	{
+		std::string const doc_root = "../data/server/";
+		std::uint8_t const threads = 2;
+		std::uint32_t expire_time = 10;
+		// The io_context is required for all I/O
+		asio::io_context ioc;
+		asio::ssl::context ctx{ asio::ssl::context::tlsv12 };
+		ctx.use_certificate_chain_file("../data/keys/server.crt");
+		ctx.use_private_key_file("../data/keys/server.key", asio::ssl::context::pem);
+		ctx.use_tmp_dh_file("../data/keys/dh1024.pem");
+		
+		// Create and launch a listening port
+		std::string address = "127.0.0.1";
+		std::string port = "443";
+		https_server s(ioc, ctx, cur_logger, address, port, echo_handler_ins);
 
-	std::string const doc_root = "../data/server/";
-	std::uint8_t const threads = 2;
-	std::uint32_t expire_time = 10;
-	// The io_context is required for all I/O
-	asio::io_context ioc;
-	asio::ssl::context ctx{ asio::ssl::context::tlsv12 };
-	ctx.use_certificate_chain_file("../data/keys/server.crt");
-	ctx.use_private_key_file("../data/keys/server.key", asio::ssl::context::pem);
-	ctx.use_tmp_dh_file("../data/keys/dh512.pem");
-	auto cur_logger = create_logger("server");
-	// Create and launch a listening port
-	std::string address = "127.0.0.1";
-	std::string port = "443";
-	https_server s(ioc, ctx, address, port, echo_handler_ins);
-
-	// Run the server until stopped.
-	s.run();
-	ioc.run();
+		// Run the server until stopped.
+		s.run();
+		ioc.run();
+	}
+	catch (std::exception& e)
+	{
+		cur_logger->error("error {}", e.what());
+	}
+	
 
 	return EXIT_SUCCESS;
 }

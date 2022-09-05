@@ -89,20 +89,17 @@ make_verbose_verification(Verifier verifier)
 	return verbose_verification<Verifier>(verifier);
 }
 
-
-
-int main()
+void test_global(const std::string& address)
 {
 	request cur_req;
 	cur_req.uri = "/";
 	cur_req.method = "GET";
 	cur_req.http_version_major = 1;
 	cur_req.http_version_minor = 1;
-	std::string address = "www.baidu.com";
 	std::string port = "443";
 	// The io_context is required for all I/O
 	asio::io_context ioc;
-	asio::ssl::context ctx{ asio::ssl::context::sslv23 };
+	asio::ssl::context ctx{ asio::ssl::context::tlsv12 };
 #ifdef _MSC_VER
 	add_windows_root_certs(ctx);
 #else
@@ -116,14 +113,70 @@ int main()
 	//cur_request.host = "127.0.0.1";
 	auto cur_lambda = [](const std::string& err, const reply& rep)
 	{
-		std::cout << "err is " << err << " status is " << rep.status_code << " content is " << rep.content << std::endl;
+		std::cout << "err is " << err << " status is " << rep.status_code << " content is " << rep.content.substr(rep.content.size() - 20) << std::endl;
 	};
 
-	auto cur_client = std::make_shared<https_client>(ioc,ctx, address, port, cur_req, cur_lambda, 5);
+	auto cur_client = std::make_shared<https_client>(ioc, ctx, create_logger("https_client"), address, port, cur_req, cur_lambda, 5);
 
 	// Run the server until stopped.
 	cur_client->run();
 	ioc.run();
 
-	return EXIT_SUCCESS;
+}
+
+void test_local()
+{
+	try
+	{
+		auto cur_logger = create_logger("https_client");
+		request cur_req;
+		cur_req.uri = "/";
+		cur_req.method = "GET";
+		cur_req.http_version_major = 1;
+		cur_req.http_version_minor = 1;
+		cur_req.body = "lalal";
+		std::string address = "127.0.0.1";
+		std::string port = "443";
+		// The io_context is required for all I/O
+		asio::io_context ioc;
+		asio::ssl::context ctx{ asio::ssl::context::tlsv12 };
+		
+		ctx.load_verify_file("../data/keys/server.crt");
+		ctx.set_verify_mode(asio::ssl::verify_peer);
+		ctx.set_verify_callback(
+			[=](bool v, asio::ssl::verify_context& ctx) -> bool
+			{
+				if (v)
+					return true;
+				X509_STORE_CTX* sctx = ctx.native_handle();
+				int error = X509_STORE_CTX_get_error(sctx);
+				char name[256];
+				X509* cert = X509_STORE_CTX_get_current_cert(sctx);
+				X509_NAME_oneline(X509_get_subject_name(cert), name, 256);
+				cur_logger->info("verify_callback.untrusted ca ({}) error = {} preverify {}", name, error, v);
+				return v;
+			});
+		//cur_request.host = "127.0.0.1";
+		auto cur_lambda = [](const std::string& err, const reply& rep)
+		{
+			std::cout << "err is " << err << " status is " << rep.status_code << " content is " << rep.content << std::endl;
+		};
+
+		auto cur_client = std::make_shared<https_client>(ioc, ctx, cur_logger, address, port, cur_req, cur_lambda, 5);
+
+		// Run the server until stopped.
+		cur_client->run();
+		ioc.run();
+	}
+	catch (std::exception& e)
+	{
+		std::cout << "exception " << e.what() << std::endl;
+	}
+	
+
+}
+
+int main()
+{
+	test_local();
 }

@@ -7,7 +7,8 @@
 #include <ostream>
 #include <asio.hpp>
 #include "http_reply_parser.h"
-#include "asio/ssl.hpp"
+#include <asio/ssl.hpp>
+#include <spdlog/logger.h>
 
 namespace spiritsaway::http_utils
 {
@@ -26,9 +27,10 @@ namespace spiritsaway::http_utils
 		const std::size_t m_timeout_seconds = 5;
 		http_reply_parser m_rep_parser;
 		asio::ssl::stream<asio::ip::tcp::socket> m_socket;
+		std::shared_ptr<spdlog::logger> m_logger;
 
 	public:
-		https_client(asio::io_context& io_context, asio::ssl::context& ssl_context, const std::string& server_url, const std::string& server_port, const request& req, std::function<void(const std::string&, const reply&)> callback, std::uint32_t timeout_second);
+		https_client(asio::io_context& io_context, asio::ssl::context& ssl_context, std::shared_ptr<spdlog::logger> in_logger, const std::string& server_url, const std::string& server_port, const request& req, std::function<void(const std::string&, const reply&)> callback, std::uint32_t timeout_second);
 		void run();
 
 	private:

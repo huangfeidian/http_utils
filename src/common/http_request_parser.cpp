@@ -34,12 +34,16 @@ namespace spiritsaway::http_utils
 		}
 		int on_header_complete_cb(http_parser *parser)
 		{
+			auto& t = *reinterpret_cast<http_request_parser*>(parser->data);
+			t.m_req.http_version_major = parser->http_major;
+			t.m_req.http_version_minor = parser->http_minor;
 			return 0;
 		}
 		int on_message_complete_cb(http_parser *parser)
 		{
 			auto &t = *reinterpret_cast<http_request_parser *>(parser->data);
 			t.m_req_complete = true;
+
 			return 0;
 		}
 	} // namespace

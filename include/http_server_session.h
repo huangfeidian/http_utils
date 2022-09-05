@@ -7,6 +7,7 @@
 
 #include "http_request_parser.h"
 #include "http_session_manager.h"
+#include <spdlog/logger.h>
 
 namespace spiritsaway::http_utils
 {
@@ -20,7 +21,7 @@ namespace spiritsaway::http_utils
 		http_server_session &operator=(const http_server_session &) = delete;
 
 		/// Construct a http_server_session with the given socket.
-		explicit http_server_session(asio::ip::tcp::socket socket, http_session_manager<http_server_session>& session_mgr, const request_handler &handler);
+		explicit http_server_session(asio::ip::tcp::socket socket, std::shared_ptr<spdlog::logger> in_logger, std::uint64_t in_session_idx, http_session_manager<http_server_session>& session_mgr, const request_handler &handler);
 
 		/// Start the first asynchronous operation for the http_server_session.
 		void start();
@@ -41,18 +42,19 @@ namespace spiritsaway::http_utils
 		void on_timeout();
 
 		/// Socket for the http_server_session.
-		asio::ip::tcp::socket socket_;
+		asio::ip::tcp::socket m_socket;
 
+		std::shared_ptr<spdlog::logger> m_logger;
 		/// The manager for this http_server_session.
 
 		/// The handler used to process the incoming request.
 		const request_handler m_request_handler;
 
 		/// Buffer for incoming data.
-		std::array<char, 8192> buffer_;
+		std::array<char, 8192> m_buffer;
 
 		/// The incoming request.
-		std::shared_ptr<request> request_;
+		std::shared_ptr<request> m_request;
 
 		/// The parser for the incoming request.
 		http_request_parser m_request_parser;
@@ -60,13 +62,14 @@ namespace spiritsaway::http_utils
 		http_session_manager<http_server_session>& m_session_mgr;
 
 		/// The reply to be sent back to the client.
-		reply reply_;
+		reply m_reply;
 
 		std::string m_reply_str;
 
 		// timeout timer
-		asio::basic_waitable_timer<std::chrono::steady_clock> con_timer_;
-		const std::size_t timeout_seconds_ = 5;
+		asio::basic_waitable_timer<std::chrono::steady_clock> m_con_timer;
+		const std::size_t m_timeout_seconds = 5;
+		const std::uint64_t m_session_idx;
 	};
 
 	typedef std::shared_ptr<http_server_session> http_server_session_ptr;

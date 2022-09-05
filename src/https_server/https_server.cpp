@@ -5,14 +5,15 @@
 namespace spiritsaway::http_utils
 {
 
-	https_server::https_server(asio::io_context &io_context, asio::ssl::context& in_ssl_ctx, const std::string &address, const std::string &port, const request_handler &handler)
-		: m_ioc(io_context),
-		  m_ssl_ctx(in_ssl_ctx),
-		  m_acceptor(io_context),
-		  m_session_mgr(),
-		  m_request_handler(handler),
-		  m_address(address),
-		  m_port(port)
+	https_server::https_server(asio::io_context& io_context, asio::ssl::context& in_ssl_ctx, std::shared_ptr<spdlog::logger> in_logger, const std::string& address, const std::string& port, const request_handler& handler)
+		: m_ioc(io_context)
+		, m_ssl_ctx(in_ssl_ctx)
+		, m_acceptor(io_context)
+		, m_session_mgr()
+		, m_request_handler(handler)
+		, m_address(address)
+		, m_port(port)
+		, m_logger(in_logger)
 	{
 	}
 
@@ -45,7 +46,7 @@ namespace spiritsaway::http_utils
 				{
 					m_session_mgr.start(std::make_shared<https_server_session>(
 						asio::ssl::stream<asio::ip::tcp::socket>(
-							std::move(socket), m_ssl_ctx),
+							std::move(socket), m_ssl_ctx), m_logger, m_session_counter++,
 						m_session_mgr, m_request_handler));
 				}
 

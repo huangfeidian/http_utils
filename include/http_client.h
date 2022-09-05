@@ -6,6 +6,7 @@
 #include <istream>
 #include <ostream>
 #include <asio.hpp>
+#include <spdlog/logger.h>
 #include "http_reply_parser.h"
 
 namespace spiritsaway::http_utils
@@ -26,13 +27,13 @@ namespace spiritsaway::http_utils
 		asio::basic_waitable_timer<std::chrono::steady_clock> m_timer;
 		const std::size_t m_timeout_seconds = 5;
 		http_reply_parser m_rep_parser;
-
+		std::shared_ptr<spdlog::logger> m_logger;
 	public:
-		http_client(asio::io_context &io_context, const std::string &server_url, const std::string &server_port, const request &req, std::function<void(const std::string &, const reply &)> callback, std::uint32_t timeout_second);
+		http_client(asio::io_context &io_context, std::shared_ptr<spdlog::logger> in_logger, const std::string &server_url, const std::string &server_port, const request &req, std::function<void(const std::string &, const reply &)> callback, std::uint32_t timeout_second);
 		void run();
 
 	private:
-		void handle_resolve(const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator);
+		void handle_resolve(const asio::error_code& err, asio::ip::tcp::resolver::iterator iterator);
 		void handle_connect(const asio::error_code &err);
 		void handle_write_request(const asio::error_code &err);
 		void handle_read_content(const asio::error_code &err, std::size_t n);

@@ -3,31 +3,17 @@
 
 namespace spiritsaway::http_utils
 {
-	https_client::https_client(asio::io_context& io_context, asio::ssl::context& ssl_context, const std::string& server_url, const std::string& server_port, const request& req, std::function<void(const std::string&, const reply&)> callback, std::uint32_t timeout_second)
+	https_client::https_client(asio::io_context& io_context, asio::ssl::context& ssl_context, std::shared_ptr<spdlog::logger> in_logger, const std::string& server_url, const std::string& server_port, const request& req, std::function<void(const std::string&, const reply&)> callback, std::uint32_t timeout_second)
 		: m_socket(io_context, ssl_context), m_resolver(io_context), m_callback(callback)
 		, m_req_str(req.to_string(server_url, server_port))
 		, m_timer(io_context)
 		, m_timeout_seconds(timeout_second)
 		, m_server_url(server_url)
 		, m_server_port(server_port)
+		, m_logger(in_logger)
 	{
-		//m_socket.set_verify_mode(asio::ssl::verify_peer);
-		//m_socket.set_verify_callback([this](bool preverified,
-		//	asio::ssl::verify_context& ctx)
-		//	{
-		//		return verify_certificate(preverified, ctx);
-		//	});
 
-	}
-	bool https_client::verify_certificate(bool preverified,
-		asio::ssl::verify_context& ctx)
-	{
-		char subject_name[256];
-		X509* cert = X509_STORE_CTX_get_current_cert(ctx.native_handle());
-		X509_NAME_oneline(X509_get_subject_name(cert), subject_name, 256);
-		std::cout << "Verifying " << subject_name << "\n";
 
-		return preverified;
 	}
 	void https_client::run()
 	{
@@ -112,8 +98,7 @@ namespace spiritsaway::http_utils
 			}
 			return;
 		}
-		// std::string temp_content(m_content_read_buffer.data(), n);
-		// std::cout << "read content: " << temp_content << std::endl;
+		m_logger->trace("read content {}", std::string_view(m_content_read_buffer.data(), n));
 		auto temp_parse_result = m_rep_parser.parse(m_content_read_buffer.data(), n);
 		if (temp_parse_result == http_reply_parser::result_type::bad)
 		{
@@ -131,7 +116,7 @@ namespace spiritsaway::http_utils
 		m_timer.cancel();
 		m_callback(err, m_rep_parser.m_reply);
 		asio::error_code ignore_ec;
-		m_socket.lowest_layer().close(ignore_ec);
+		m_socket.shutdown(ignore_ec);
 
 	}
 

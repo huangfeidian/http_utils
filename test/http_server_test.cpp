@@ -1,9 +1,25 @@
 ﻿#include "http_server.h"
 #include <iostream>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/fmt/ostr.h>
+#include <spdlog/logger.h>
 using namespace spiritsaway::http_utils;
 using namespace std;
 
+std::shared_ptr<spdlog::logger> create_logger(const std::string& name)
+{
+	auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+	console_sink->set_level(spdlog::level::debug);
+	std::string pattern = "[" + name + "] [%^%l%$] %v";
+	console_sink->set_pattern(pattern);
 
+	auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(name + ".log", true);
+	file_sink->set_level(spdlog::level::trace);
+	auto logger = std::make_shared<spdlog::logger>(name, spdlog::sinks_init_list{ console_sink, file_sink });
+	logger->set_level(spdlog::level::trace);
+	return logger;
+}
 
 int main()
 {
@@ -40,7 +56,7 @@ int main()
 		};
 		std::string address = "127.0.0.1";
 		std::string port = "8080";
-		http_server s(cur_context, address, port, echo_handler_ins);
+		http_server s(cur_context, create_logger("http_server"), address, port, echo_handler_ins);
 
 		// Run the server until stopped.
 		s.run();
