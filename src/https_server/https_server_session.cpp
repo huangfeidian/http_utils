@@ -1,32 +1,50 @@
 
-#include "http_server_session.h"
+#include "https_server_session.h"
 #include <utility>
 #include <vector>
-#include "http_session_manager.h"
 #include <iostream>
 
 namespace spiritsaway::http_utils {
 
-	http_server_session::http_server_session(asio::ip::tcp::socket socket, http_session_manager<http_server_session>& session_mgr, const request_handler& handler)
+	https_server_session::https_server_session(asio::ssl::stream<asio::ip::tcp::socket> socket, http_session_manager<https_server_session>& session_mgr, const request_handler& handler)
 		: socket_(std::move(socket)),
 		m_session_mgr(session_mgr),
 		m_request_handler(handler),
 		con_timer_(socket_.get_executor())
 	{
-		std::cout << "new http_server_session begin" << std::endl;
+		std::cout << "new https_server_session begin" << std::endl;
 	}
 
-	void http_server_session::start()
+	void https_server_session::start()
 	{
-		do_read();
+		do_handshake();
 	}
 
-	void http_server_session::stop()
+	void https_server_session::stop()
 	{
-		socket_.close();
+		asio::error_code ignored_ec;
+		socket_.lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both,
+			ignored_ec);
+		m_session_mgr.stop(shared_from_this());
+	}
+	void https_server_session::do_handshake()
+	{
+		auto self(shared_from_this());
+		socket_.async_handshake(asio::ssl::stream_base::server, 
+			[this, self](const std::error_code& error)
+			{
+			if (!error)
+			{
+				do_read();
+			}
+			else
+			{
+				stop();
+			}
+			});
 	}
 
-	void http_server_session::do_read()
+	void https_server_session::do_read()
 	{
 		auto self(shared_from_this());
 
@@ -66,13 +84,13 @@ namespace spiritsaway::http_utils {
 			});
 	}
 
-	void http_server_session::do_write()
+	void https_server_session::do_write()
 	{
 		auto self(shared_from_this());
 
 		if (con_timer_.expires_from_now(std::chrono::seconds(timeout_seconds_)) != 0)
 		{
-			m_session_mgr.stop(self);
+			stop();
 			return;
 		}
 		m_reply_str = reply_.to_string();
@@ -81,10 +99,8 @@ namespace spiritsaway::http_utils {
 			{
 				if (!ec)
 				{
-					// Initiate graceful http_server_session closure.
-					asio::error_code ignored_ec;
-					socket_.shutdown(asio::ip::tcp::socket::shutdown_both,
-						ignored_ec);
+					// Initiate graceful https_server_session closure.
+					stop();
 				}
 
 				if (ec != asio::error::operation_aborted)
@@ -94,18 +110,18 @@ namespace spiritsaway::http_utils {
 			});
 	}
 
-	void http_server_session::on_reply(const reply& in_reply)
+	void https_server_session::on_reply(const reply& in_reply)
 	{
 		con_timer_.cancel();
 		reply_ = in_reply;
 		do_write();
 
 	}
-	void http_server_session::on_timeout()
+	void https_server_session::on_timeout()
 	{
 		m_session_mgr.stop(shared_from_this());
 	}
-	void http_server_session::handle_request()
+	void https_server_session::handle_request()
 	{
 		auto self = shared_from_this();
 		request_ = std::make_shared<request>();
@@ -115,7 +131,7 @@ namespace spiritsaway::http_utils {
 			m_session_mgr.stop(self);
 			return;
 		}
-		auto weak_self = std::weak_ptr<http_server_session>(self);
+		auto weak_self = std::weak_ptr<https_server_session>(self);
 		auto weak_request = std::weak_ptr<request>(request_);
 		m_request_handler(weak_request, [weak_self](const reply& in_reply) {
 			auto strong_self = weak_self.lock();

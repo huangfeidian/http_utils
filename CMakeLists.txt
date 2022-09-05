@@ -66,7 +66,11 @@ add_executable(http_client_test ${TEST_DIR}/http_client_test.cpp)
 target_link_libraries(http_client_test http_client)
 
 add_executable(https_client_test ${TEST_DIR}/https_client_test.cpp)
-target_link_libraries(https_client_test https_client ${OPENSSL_LIBRARIES})
+if(MSVC)
+target_link_libraries(https_client_test https_client Crypt32.lib)
+else()
+target_link_libraries(https_client_test https_client)
+endif()
 
 add_executable(http_server_test ${TEST_DIR}/http_server_test.cpp)
 target_link_libraries(http_server_test http_server)

@@ -3,7 +3,7 @@
 #include <asio.hpp>
 #include <string>
 #include "http_server_session.h"
-#include "http_server_session_manager.h"
+#include "http_session_manager.h"
 
 
 namespace spiritsaway::http_utils
@@ -40,7 +40,7 @@ namespace spiritsaway::http_utils
 		asio::ip::tcp::acceptor m_acceptor;
 
 		/// The http_server_session manager which owns all live http_server_sessions.
-		http_server_session_manager m_session_mgr;
+		http_session_manager<http_server_session> m_session_mgr;
 
 		/// The handler for all incoming requests.
 		const request_handler m_request_handler;

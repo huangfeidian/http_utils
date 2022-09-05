@@ -112,7 +112,7 @@ namespace spiritsaway::http_utils
 			}
 			return;
 		}
-		std::string temp_content(m_content_read_buffer.data(), n);
+		// std::string temp_content(m_content_read_buffer.data(), n);
 		// std::cout << "read content: " << temp_content << std::endl;
 		auto temp_parse_result = m_rep_parser.parse(m_content_read_buffer.data(), n);
 		if (temp_parse_result == http_reply_parser::result_type::bad)

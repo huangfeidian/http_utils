@@ -4,6 +4,10 @@
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/logger.h>
 #include <fstream>
+#ifdef _MSC_VER
+#include <wincrypt.h>
+#endif
+
 
 using namespace spiritsaway::http_utils;
 using namespace std;
@@ -22,6 +26,33 @@ std::shared_ptr<spdlog::logger> create_logger(const std::string& name)
 	logger->set_level(spdlog::level::trace);
 	return logger;
 }
+#ifdef _MSC_VER
+void add_windows_root_certs(asio::ssl::context& ctx)
+{
+	HCERTSTORE hStore = CertOpenSystemStore(0, "ROOT");
+	if (hStore == NULL) {
+		return;
+	}
+
+	X509_STORE* store = X509_STORE_new();
+	PCCERT_CONTEXT pContext = NULL;
+	while ((pContext = CertEnumCertificatesInStore(hStore, pContext)) != NULL) {
+		X509* x509 = d2i_X509(NULL,
+			(const unsigned char**)&pContext->pbCertEncoded,
+			pContext->cbCertEncoded);
+		if (x509 != NULL) {
+			X509_STORE_add_cert(store, x509);
+			X509_free(x509);
+		}
+	}
+
+	CertFreeCertificateContext(pContext);
+	CertCloseStore(hStore, 0);
+
+	SSL_CTX_set_cert_store(ctx.native_handle(), store);
+}
+#endif
+
 
 ///@brief Helper class that prints the current certificate's subject
 ///       name and the verification results.
@@ -44,11 +75,7 @@ public:
 		bool verified = verifier_(preverified, ctx);
 		std::cout << "Verifying: " << subject_name << "\n"
 			"Verified: " << verified << std::endl;
-#ifdef _MSC_VER
-		return true;
-#else
 		return verified;
-#endif
 	}
 private:
 	Verifier verifier_;
@@ -76,7 +103,11 @@ int main()
 	// The io_context is required for all I/O
 	asio::io_context ioc;
 	asio::ssl::context ctx{ asio::ssl::context::sslv23 };
+#ifdef _MSC_VER
+	add_windows_root_certs(ctx);
+#else
 	ctx.set_default_verify_paths();
+#endif
 	//ctx.load_verify_file("../data/keys/server.crt");
 	ctx.set_verify_mode(asio::ssl::verify_peer);
 	ctx.set_verify_callback(make_verbose_verification(

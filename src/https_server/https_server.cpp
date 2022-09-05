@@ -1,376 +1,66 @@
 ﻿
-#include <https_server.h>
-#include <magic_enum.hpp>
-#include <spdlog/fmt/ostr.h>
+#include "https_server.h"
+#include <utility>
 
-
-using namespace spiritsaway::http_utils::common;
-using namespace spiritsaway::http_utils::ssl_server;
-
-// Start the asynchronous operation
-void session::run()
+namespace spiritsaway::http_utils
 {
-	// We need to be executing within a strand to perform async operations
-	// on the I/O objects in this session. Although not strictly necessary
-	// for single-threaded contexts, this example code is written to be
-	// thread-safe by default.
-	net::dispatch(
-		stream_.get_executor(),
-		beast::bind_front_handler(
-			&session::on_run,
-			shared_from_this()));
-}
 
-void session::on_run()
-{
-	// Set the timeout.
-		beast::get_lowest_layer(stream_).expires_after(
-			std::chrono::seconds(expire_time));
-
-		// Perform the SSL handshake
-		stream_.async_handshake(
-			ssl::stream_base::server,
-			beast::bind_front_handler(
-				&session::on_handshake,
-				shared_from_this()));
-}
-
-void session::on_handshake(beast::error_code ec)
-{
-	if(ec)
-		return fail(ec, error_pos::handshake);
-
-	do_read();
-}
-
-void session::do_read()
-{
-	// Make the request empty before reading,
-	// otherwise the operation behavior is undefined.
-	req_ = {};
-
-	// Set the timeout.
-	beast::get_lowest_layer(stream_).expires_after(std::chrono::seconds(expire_time));
-
-	// Read a request
-	http::async_read(stream_, buffer_, req_,
-		beast::bind_front_handler(
-			&session::on_read,
-			shared_from_this()));
-}
-
-void session::on_read(
-	beast::error_code ec,
-	std::size_t bytes_transferred)
-{
-	boost::ignore_unused(bytes_transferred);
-
-	// This means they closed the connection
-	if(ec == http::error::end_of_stream)
-		return do_close();
-
-	if(ec)
-		return fail(ec, error_pos::read);
-
-	// Send the response
-	auto check_error = check_request();
-	if (!check_error.empty())
+	https_server::https_server(asio::io_context &io_context, asio::ssl::context& in_ssl_ctx, const std::string &address, const std::string &port, const request_handler &handler)
+		: m_ioc(io_context),
+		  m_ssl_ctx(in_ssl_ctx),
+		  m_acceptor(io_context),
+		  m_session_mgr(),
+		  m_request_handler(handler),
+		  m_address(address),
+		  m_port(port)
 	{
-		do_write(create_response::bad_request(check_error, req_));
-		return;
 	}
 
-	route_request();
-}
-
-void session::do_write(http::response<http::string_body>&& msg)
-{
-	// The lifetime of the message has to extend
-	// for the duration of the async operation so
-	// we use a shared_ptr to manage it.
-	string_res_ = std::make_shared<http::response<http::string_body>>(std::move(msg));
-
-
-	// Write the response
-	beast::get_lowest_layer(stream_).expires_after(
-		std::chrono::seconds(expire_time));
-	auto write_callback = [self = shared_from_this()](beast::error_code ec, std::size_t bytes_transferred)
+	void https_server::run()
 	{
-		return self->on_write(ec, bytes_transferred);
-	};
-	http::async_write(stream_, *string_res_, write_callback);
-}
-void session::do_write(http::response<http::file_body>&& msg)
-{
-	// The lifetime of the message has to extend
-	// for the duration of the async operation so
-	// we use a shared_ptr to manage it.
-	file_res_ = std::make_shared<http::response<http::file_body>>(std::move(msg));
-
-
-	// Write the response
-	beast::get_lowest_layer(stream_).expires_after(
-		std::chrono::seconds(expire_time));
-	auto write_callback = [self = shared_from_this()](beast::error_code ec, std::size_t bytes_transferred)
-	{
-		return self->on_write(ec, bytes_transferred);
-	};
-	http::async_write(stream_, *file_res_, write_callback);
-}
-
-void session::on_write(
-	beast::error_code ec,
-	std::size_t bytes_transferred)
-{
-	boost::ignore_unused(bytes_transferred);
-
-	if (ec)
-		return fail(ec, error_pos::write);
-
-	if (should_close())
-	{
-		// This means we should close the connection, usually because
-		// the response indicated the "Connection: close" semantic.
-		return do_close();
+		// Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
+		asio::ip::tcp::resolver resolver(m_ioc);
+		asio::ip::tcp::endpoint endpoint =
+			*resolver.resolve(m_address, m_port).begin();
+		m_acceptor.open(endpoint.protocol());
+		m_acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+		m_acceptor.bind(endpoint);
+		m_acceptor.listen();
+		do_accept();
 	}
 
-	// We're done with the response so delete it
-	string_res_ = nullptr;
-	file_res_ = nullptr;
-	// Read another request
-	do_read();
-}
-
-bool session::should_close() const
-{
-	if (string_res_->need_eof())
+	void https_server::do_accept()
 	{
-		return false;
-	}
-	return true;
-}
+		m_acceptor.async_accept(
+			[this](std::error_code ec, asio::ip::tcp::socket socket)
+			{
+				// Check whether the https_server was stopped by a signal before this
+				// completion handler had a chance to run.
+				if (!m_acceptor.is_open())
+				{
+					return;
+				}
 
-void session::do_close()
-{
-	// Set the timeout.
-	string_res_ = nullptr;
-	file_res_ = nullptr;
-	beast::get_lowest_layer(stream_).expires_after(std::chrono::seconds(expire_time));
+				if (!ec)
+				{
+					m_session_mgr.start(std::make_shared<https_server_session>(
+						asio::ssl::stream<asio::ip::tcp::socket>(
+							std::move(socket), m_ssl_ctx),
+						m_session_mgr, m_request_handler));
+				}
 
-	// Perform the SSL shutdown
-	stream_.async_shutdown(
-		beast::bind_front_handler(
-			&session::on_shutdown,
-			shared_from_this()));
-}
-
-void session::on_shutdown(beast::error_code ec)
-{
-	if(ec)
-		return fail(ec, error_pos::shutdown);
-
-	// At this point the connection is closed gracefully
-}
-
-
-void session::fail(beast::error_code ec, error_pos where)
-{
-	// ssl::error::stream_truncated, also known as an SSL "short read",
-	// indicates the peer closed the connection without performing the
-	// required closing handshake (for example, Google does this to
-	// improve performance). Generally this can be a security issue,
-	// but if your communication protocol is self-terminated (as
-	// it is with both HTTP and WebSocket) then you may simply
-	// ignore the lack of close_notify.
-	//
-	// https://github.com/boostorg/beast/issues/38
-	//
-	// https://security.stackexchange.com/questions/91435/how-to-handle-a-malicious-ssl-tls-shutdown
-	//
-	// When a short read would cut off the end of an HTTP message,
-	// Beast returns the error beast::http::error::partial_message.
-	// Therefore, if we see a short read here, it has occurred
-	// after the message has been completed, so it is safe to ignore it.
-
-	if(ec == net::ssl::error::stream_truncated)
-	{
-		return;
-	}
-	logger->info("fail in https server session ec is {} where is {}", ec.message(), magic_enum::enum_name(where));
-}
-
-
-
-std::string session::check_request()
-{
-	// Make sure we can handle the method
-	if (req_.method() != http::verb::get &&
-		req_.method() != http::verb::head && req_.method() != http::verb::post)
-	{
-		return "Unknown HTTP-method";
+				do_accept();
+			});
 	}
 
-
-	// Request path must be absolute and not contain "..".
-	if (req_.target().empty() ||
-		req_.target()[0] != '/' ||
-		req_.target().find("..") != beast::string_view::npos)
+	void https_server::stop()
 	{
-		return "Illegal request-target";
+		m_acceptor.close();
+		m_session_mgr.stop_all();
 	}
 
-	return "";
-
-}
-void session::route_request()
-{
-	return do_write(create_response::not_found("route_request not implemented", req_));
-}
-
-void file_session::route_request()
-{
-	// Build the path to the requested file
-
-	std::string path = create_response::path_cat(*doc_root_, req_.target());
-	if(req_.target().back() == '/')
-		path.append("index.html");
-
-	// Attempt to open the file
-	beast::error_code ec;
-	http::file_body::value_type body;
-	body.open(path.c_str(), beast::file_mode::scan, ec);
-
-	// Handle the case where the file doesn't exist
-	if(ec == beast::errc::no_such_file_or_directory)
-		return do_write(create_response::not_found(req_.target(), req_));
-
-	// Handle an unknown error
-	if(ec)
-		return do_write(create_response::server_error(ec.message(), req_));
-
-	// Cache the size since we need it after the move
-	auto const size = body.size();
-
-	// Respond to HEAD request
-	if(req_.method() == http::verb::head)
+	std::size_t https_server::get_session_count()
 	{
-		http::response<http::string_body> res{http::status::ok, req_.version()};
-		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-		res.set(http::field::content_type, create_response::mime_type(path));
-		res.content_length(size);
-		res.keep_alive(req_.keep_alive());
-		return do_write(std::move(res));
+		return m_session_mgr.get_session_count();
 	}
-
-	// Respond to GET request
-	http::response<http::file_body> res{
-		std::piecewise_construct,
-		std::make_tuple(std::move(body)),
-		std::make_tuple(http::status::ok, req_.version())};
-	res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-	res.set(http::field::content_type, create_response::mime_type(path));
-	res.content_length(size);
-	res.keep_alive(req_.keep_alive());
-	return do_write(std::move(res));
-}
-
-listener::listener(
-	net::io_context& ioc,
-	ssl::context& ctx,
-	tcp::endpoint endpoint,
-	logger_t in_logger,
-	std::uint32_t in_expire_time)
-	: ioc_(ioc)
-	, ctx_(ctx)
-	, acceptor_(ioc)
-	, logger(std::move(in_logger))
-	, expire_time(in_expire_time)
-{
-	beast::error_code ec;
-
-	// Open the acceptor
-	acceptor_.open(endpoint.protocol(), ec);
-	if(ec)
-	{
-		fail(ec, error_pos::open);
-		return;
-	}
-
-	// Allow address reuse
-	acceptor_.set_option(net::socket_base::reuse_address(true), ec);
-	if(ec)
-	{
-		fail(ec, error_pos::set_option);
-		return;
-	}
-
-	// Bind to the server address
-	acceptor_.bind(endpoint, ec);
-	if(ec)
-	{
-		fail(ec, error_pos::bind);
-		return;
-	}
-
-	// Start listening for connections
-	acceptor_.listen(
-		net::socket_base::max_listen_connections, ec);
-	if(ec)
-	{
-		fail(ec, error_pos::listen);
-		return;
-	}
-	valid = true;
-}
-
-// Start accepting incoming connections
-bool listener::run()
-{
-	if(!valid)
-	{
-		return false;
-	}
-	do_accept();
-	return true;
-}
-
-void listener::do_accept()
-{
-	// The new connection gets its own strand
-	acceptor_.async_accept(
-		net::make_strand(ioc_),
-		beast::bind_front_handler(
-			&listener::on_accept,
-			shared_from_this()));
-}
-
-void listener::on_accept(beast::error_code ec, tcp::socket socket)
-{
-	if(ec)
-	{
-		fail(ec, error_pos::accept);
-	}
-	else
-	{
-		// Create the session and run it
-		auto cur_session = make_session(std::move(socket));
-		cur_session->run();
-	}
-
-	// Accept another connection
-	do_accept();
-}
-void listener::fail(beast::error_code ec, error_pos where)
-{
-	logger->info("fail in https server listend ec is {} what is {}", ec.message(), magic_enum::enum_name(where));
-}
-
-std::shared_ptr<session> listener::make_session(tcp::socket&& socket)
-{
-	return std::make_shared<session>(std::move(socket), ctx_, logger,  expire_time);
-}
-
-std::shared_ptr<session> file_listener::make_session(tcp::socket&& socket)
-{
-	return std::make_shared<file_session>(std::move(socket), ctx_, logger, expire_time, doc_root);
-}
+} // namespace spiritsaway::http_https_server
