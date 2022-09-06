@@ -15,7 +15,6 @@ namespace spiritsaway::http_utils {
 		, m_con_timer(m_socket.get_executor())
 		, m_session_idx(in_session_idx)
 	{
-		std::cout << "new http_server_session begin" << std::endl;
 	}
 
 	void http_server_session::start()
@@ -26,7 +25,11 @@ namespace spiritsaway::http_utils {
 
 	void http_server_session::stop()
 	{
-		m_socket.close();
+		m_logger->debug("session {} stop", m_session_idx);
+		asio::error_code ignored_ec;
+		m_socket.shutdown(asio::ip::tcp::socket::shutdown_both,
+			ignored_ec);
+		
 	}
 
 	void http_server_session::do_read()
@@ -38,7 +41,14 @@ namespace spiritsaway::http_utils {
 			m_session_mgr.stop(self);
 			return;
 		}
-
+		m_con_timer.async_wait([self, this](const asio::error_code& error)
+			{
+				if (error != asio::error::operation_aborted)
+				{
+					on_timeout("read_request");
+				}
+				
+			});
 		m_socket.async_read_some(asio::buffer(m_buffer),
 			[this, self](std::error_code ec, std::size_t bytes_transferred)
 			{
@@ -54,6 +64,7 @@ namespace spiritsaway::http_utils {
 					}
 					else if (result == http_request_parser::result_type::bad)
 					{
+						m_stopped = true;
 						m_reply = reply::stock_reply(reply::status_type::bad_request);
 						do_write();
 					}
@@ -72,22 +83,29 @@ namespace spiritsaway::http_utils {
 	void http_server_session::do_write()
 	{
 		auto self(shared_from_this());
-
+		m_con_timer.cancel();
 		if (m_con_timer.expires_from_now(std::chrono::seconds(m_timeout_seconds)) != 0)
 		{
 			m_session_mgr.stop(self);
 			return;
 		}
+		m_con_timer.async_wait([self, this](const asio::error_code& error)
+			{
+				if (error != asio::error::operation_aborted)
+				{
+					on_timeout("write reply");
+				}
+			});
 		m_reply_str = m_reply.to_string();
 		asio::async_write(m_socket, asio::buffer(m_reply_str),
 			[this, self](std::error_code ec, std::size_t)
 			{
+				m_con_timer.cancel();
 				if (!ec)
 				{
 					// Initiate graceful http_server_session closure.
-					asio::error_code ignored_ec;
-					m_socket.shutdown(asio::ip::tcp::socket::shutdown_both,
-						ignored_ec);
+					m_session_mgr.stop(shared_from_this());
+					return;
 				}
 
 				if (ec != asio::error::operation_aborted)
@@ -99,34 +117,42 @@ namespace spiritsaway::http_utils {
 
 	void http_server_session::on_reply(const reply& in_reply)
 	{
+		if (m_stopped)
+		{
+			return;
+		}
 		m_con_timer.cancel();
 		m_reply = in_reply;
 		do_write();
 
 	}
-	void http_server_session::on_timeout()
+	void http_server_session::on_timeout(const std::string& reason)
 	{
-		m_logger->warn("session {} timeout ", m_session_idx);
+		m_stopped = true;
+		m_logger->warn("session {} timeout for {} ", m_session_idx, reason);
 		m_session_mgr.stop(shared_from_this());
 	}
 	void http_server_session::handle_request()
 	{
+		m_con_timer.cancel();
 		auto self = shared_from_this();
-		m_request = std::make_shared<request>();
-		m_request_parser.move_req(*m_request);
+		m_request_parser.move_req(m_request);
 		if (m_con_timer.expires_from_now(std::chrono::seconds(m_timeout_seconds)) != 0)
 		{
 			m_session_mgr.stop(self);
 			return;
 		}
-		auto weak_self = std::weak_ptr<http_server_session>(self);
-		auto weak_request = std::weak_ptr<request>(m_request);
-		m_request_handler(weak_request, [weak_self](const reply& in_reply) {
-			auto strong_self = weak_self.lock();
-			if (strong_self)
+		m_con_timer.async_wait([self, this](const asio::error_code& error)
 			{
-				strong_self->on_reply(in_reply);
-			}
+				if (error != asio::error::operation_aborted)
+				{
+					on_timeout("handle request");
+				}
+			});
+
+
+		m_request_handler(m_request, [self, this](const reply& in_reply) {
+			on_reply(in_reply); 
 			});
 	}
 }

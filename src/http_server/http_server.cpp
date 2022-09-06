@@ -5,12 +5,11 @@
 namespace spiritsaway::http_utils
 {
 
-	http_server::http_server(asio::io_context& io_context, std::shared_ptr<spdlog::logger> in_logger, const std::string& address, const std::string& port, const request_handler& handler)
+	http_server::http_server(asio::io_context& io_context, std::shared_ptr<spdlog::logger> in_logger, const std::string& address, const std::string& port)
 		: m_ioc(io_context)
 		, m_logger(in_logger)
 		, m_acceptor(io_context)
 		, m_session_mgr()
-		, m_request_handler(handler)
 		, m_address(address)
 		, m_port(port)
 	{
@@ -44,7 +43,10 @@ namespace spiritsaway::http_utils
 				if (!ec)
 				{
 					m_session_mgr.start(std::make_shared<http_server_session>(
-						std::move(socket), m_logger, m_session_counter++, m_session_mgr, m_request_handler));
+						std::move(socket), m_logger, m_session_counter++, m_session_mgr, [this](const request& req, reply_handler rep_cb)
+						{
+							return handle_request(req, rep_cb);
+						}));
 				}
 
 				do_accept();

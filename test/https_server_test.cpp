@@ -19,6 +19,25 @@ std::shared_ptr<spdlog::logger> create_logger(const std::string& name)
 	logger->set_level(spdlog::level::trace);
 	return logger;
 }
+class echo_https_server : public https_server
+{
+public:
+	using https_server::https_server;
+protected:
+	void handle_request(const request& req, reply_handler rep_cb) override
+	{
+		reply rep;
+		// Fill out the reply to be sent to the client.
+		rep.status_code = 200;
+		rep.content = "echo request uri: " + req.uri + " body: " + req.body;
+		rep.headers.resize(2);
+		rep.headers[0].name = "Content-Length";
+		rep.headers[0].value = std::to_string(rep.content.size());
+		rep.headers[1].name = "Content-Type";
+		rep.headers[1].value = "text";
+		rep_cb(rep);
+	}
+};
 int main(int argc, char* argv[])
 {
 	// Check command line arguments.
@@ -30,25 +49,7 @@ int main(int argc, char* argv[])
 	//		"    http-server-async 0.0.0.0 8080 . 1\n";
 	//	return EXIT_FAILURE;
 	//}
-	request_handler echo_handler_ins = [](std::weak_ptr< request> weak_req, reply_handler cb)
-	{
-		auto req_ptr = weak_req.lock();
-		if (!req_ptr)
-		{
-			return;
-		}
-		auto& req = *req_ptr;
-		reply rep;
-		// Fill out the reply to be sent to the client.
-		rep.status_code = 200;
-		rep.content = "echo request uri: " + req.uri + " body: " + req.body;
-		rep.headers.resize(2);
-		rep.headers[0].name = "Content-Length";
-		rep.headers[0].value = std::to_string(rep.content.size());
-		rep.headers[1].name = "Content-Type";
-		rep.headers[1].value = "text";
-		cb(rep);
-	};
+
 	auto cur_logger = create_logger("https_server");
 	try
 	{
@@ -65,7 +66,7 @@ int main(int argc, char* argv[])
 		// Create and launch a listening port
 		std::string address = "127.0.0.1";
 		std::string port = "443";
-		https_server s(ioc, ctx, cur_logger, address, port, echo_handler_ins);
+		echo_https_server s(ioc, ctx, cur_logger, address, port);
 
 		// Run the server until stopped.
 		s.run();

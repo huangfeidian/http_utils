@@ -61,5 +61,5 @@ namespace spiritsaway::http_utils
 		static reply stock_reply(status_type status);
 	};
 	using reply_handler = std::function<void(const reply &rep)>;
-	using request_handler = std::function<void(std::weak_ptr<request> req, reply_handler cb)>;
+	using request_handler = std::function<void(const request& req, reply_handler cb)>;
 }

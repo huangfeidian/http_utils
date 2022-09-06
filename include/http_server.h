@@ -18,7 +18,7 @@ namespace spiritsaway::http_utils
 
 		/// Construct the server to listen on the specified TCP address and port, and
 		/// serve up files from the given directory.
-		explicit http_server(asio::io_context &io_context, std::shared_ptr<spdlog::logger> in_logger, const std::string &address, const std::string &port, const request_handler &handler);
+		explicit http_server(asio::io_context &io_context, std::shared_ptr<spdlog::logger> in_logger, const std::string &address, const std::string &port);
 
 		/// Run the server's io_context loop.
 		void run();
@@ -26,7 +26,8 @@ namespace spiritsaway::http_utils
 		void stop();
 
 		std::size_t get_session_count();
-
+	protected:
+		virtual void handle_request(const request& req, reply_handler rep_cb) = 0;
 	private:
 		/// Perform an asynchronous accept operation.
 		void do_accept();
@@ -43,11 +44,11 @@ namespace spiritsaway::http_utils
 		http_session_manager<http_server_session> m_session_mgr;
 
 		/// The handler for all incoming requests.
-		const request_handler m_request_handler;
 
 		const std::string m_address;
 		const std::string m_port;
 		std::atomic<std::uint64_t> m_session_counter = 0;
+	protected:
 		std::shared_ptr<spdlog::logger> m_logger;
 	};
 

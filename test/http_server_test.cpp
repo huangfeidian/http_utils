@@ -11,7 +11,7 @@ std::shared_ptr<spdlog::logger> create_logger(const std::string& name)
 {
 	auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 	console_sink->set_level(spdlog::level::debug);
-	std::string pattern = "[" + name + "] [%^%l%$] %v";
+	std::string pattern = "[%H:%M:%S.%e %z] [" + name + "] [%^%l%$] %v";
 	console_sink->set_pattern(pattern);
 
 	auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(name + ".log", true);
@@ -21,6 +21,25 @@ std::shared_ptr<spdlog::logger> create_logger(const std::string& name)
 	return logger;
 }
 
+class echo_http_server: public http_server
+{
+public:
+	using http_server::http_server;
+protected:
+	void handle_request(const request& req, reply_handler rep_cb) override
+	{
+		reply rep;
+		// Fill out the reply to be sent to the client.
+		rep.status_code = 200;
+		rep.content = "echo request uri: " + req.uri + " body: " + req.body;
+		rep.headers.resize(2);
+		rep.headers[0].name = "Content-Length";
+		rep.headers[0].value = std::to_string(rep.content.size());
+		rep.headers[1].name = "Content-Type";
+		rep.headers[1].value = "text";
+		rep_cb(rep);
+	}
+};
 int main()
 {
 	asio::io_context cur_context;
@@ -35,28 +54,10 @@ int main()
 		//}
 
 		// Initialise the server.
-		request_handler echo_handler_ins = [](std::weak_ptr< request> weak_req, reply_handler cb)
-		{
-			auto req_ptr = weak_req.lock();
-			if (!req_ptr)
-			{
-				return;
-			}
-			auto& req = *req_ptr;
-			reply rep;
-			// Fill out the reply to be sent to the client.
-			rep.status_code = 200;
-			rep.content = "echo request uri: " + req.uri + " body: " + req.body;
-			rep.headers.resize(2);
-			rep.headers[0].name = "Content-Length";
-			rep.headers[0].value = std::to_string(rep.content.size());
-			rep.headers[1].name = "Content-Type";
-			rep.headers[1].value = "text";
-			cb(rep);
-		};
+
 		std::string address = "127.0.0.1";
 		std::string port = "8080";
-		http_server s(cur_context, create_logger("http_server"), address, port, echo_handler_ins);
+		echo_http_server s(cur_context, create_logger("http_server"), address, port);
 
 		// Run the server until stopped.
 		s.run();

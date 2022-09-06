@@ -39,7 +39,7 @@ namespace spiritsaway::http_utils
 		bool should_close() const;
 		
 		void handle_request();
-		void on_timeout();
+		void on_timeout(const std::string& reason);
 
 		/// Socket for the https_server_session.
 		asio::ssl::stream<asio::ip::tcp::socket> m_socket;
@@ -53,7 +53,7 @@ namespace spiritsaway::http_utils
 		std::array<char, 8192> m_buffer;
 
 		/// The incoming request.
-		std::shared_ptr<request> m_request;
+		request m_request;
 
 		/// The parser for the incoming request.
 		http_request_parser m_request_parser;
@@ -64,6 +64,7 @@ namespace spiritsaway::http_utils
 		reply m_reply;
 
 		std::string m_reply_str;
+		bool m_stopped = false;
 
 		// timeout timer
 		asio::basic_waitable_timer<std::chrono::steady_clock> m_con_timer;
