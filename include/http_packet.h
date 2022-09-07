@@ -47,7 +47,6 @@ namespace spiritsaway::http_utils
 			service_unavailable = 503
 		};
 		std::uint32_t status_code;
-		std::string status_detail;
 
 		/// The headers to be included in the reply.
 		std::vector<header> headers;
@@ -58,7 +57,7 @@ namespace spiritsaway::http_utils
 		std::string to_string() const;
 
 		void add_header(const std::string& name, const std::string& value);
-		
+
 		/// Get a stock reply.
 		static reply stock_reply(status_type status);
 	};

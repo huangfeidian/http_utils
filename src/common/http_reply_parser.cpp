@@ -16,7 +16,6 @@ namespace spiritsaway::http_utils
 		{
 			auto &t = *reinterpret_cast<http_reply_parser *>(parser->data);
 			t.m_reply.status_code = parser->status_code;
-			t.m_reply.status_detail = std::string(at, length);
 			return 0;
 		}
 		int on_body_cb(http_parser *parser, const char *at, std::size_t length)
