@@ -55,8 +55,10 @@ namespace spiritsaway::http_utils
 		/// The content to be sent in the reply.
 		std::string content;
 
-		std::string to_string();
+		std::string to_string() const;
 
+		void add_header(const std::string& name, const std::string& value);
+		
 		/// Get a stock reply.
 		static reply stock_reply(status_type status);
 	};

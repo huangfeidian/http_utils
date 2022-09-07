@@ -89,18 +89,27 @@ namespace spiritsaway::http_utils
 
 	} // namespace misc_strings
 
-	std::string reply::to_string()
+	void reply::add_header(const std::string& key, const std::string& value)
+	{
+		headers.emplace_back(header{key, value});
+	}
+	std::string reply::to_string() const
 	{
 		std::vector<std::string> buffers;
 		buffers.push_back(status_strings::to_string(reply::status_type(status_code)));
 		for (std::size_t i = 0; i < headers.size(); ++i)
 		{
-			header &h = headers[i];
+			const header &h = headers[i];
 			buffers.push_back(h.name);
 			buffers.push_back(misc_strings::name_value_separator);
 			buffers.push_back(h.value);
 			buffers.push_back(misc_strings::crlf);
 		}
+		buffers.push_back("Content-Length");
+		buffers.push_back(misc_strings::name_value_separator);
+		buffers.push_back(std::to_string(content.size()));
+		buffers.push_back(misc_strings::crlf);
+
 		buffers.push_back(misc_strings::crlf);
 		buffers.push_back(content);
 		std::size_t total_sz = 0;
