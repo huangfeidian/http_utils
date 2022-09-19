@@ -84,8 +84,8 @@ namespace spiritsaway::http_utils
 	namespace misc_strings
 	{
 
-		const char name_value_separator[] = {':', ' '};
-		const char crlf[] = {'\r', '\n'};
+		const static std::string  name_value_separator = ": ";
+		const static std::string crlf = "\r\n";
 
 	} // namespace misc_strings
 
