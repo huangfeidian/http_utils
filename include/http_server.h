@@ -26,6 +26,9 @@ namespace spiritsaway::http_utils
 		void stop();
 
 		std::size_t get_session_count();
+		~http_server()
+		{
+		}
 	protected:
 		virtual void handle_request(const request& req, reply_handler rep_cb) = 0;
 	private:
