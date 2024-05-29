@@ -3,7 +3,7 @@
 
 #include <array>
 #include <memory>
-#include <asio.hpp>
+#include <boost/asio.hpp>
 
 #include "http_request_parser.h"
 #include "http_session_manager.h"
@@ -11,7 +11,8 @@
 
 namespace spiritsaway::http_utils
 {
-	
+	namespace asio = boost::asio;
+	using asio_ec = boost::system::error_code;
 	/// Represents a single http_server_session from a client.
 	class http_server_session
 		: public std::enable_shared_from_this<http_server_session>

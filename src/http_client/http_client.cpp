@@ -20,16 +20,16 @@ namespace spiritsaway::http_utils
 	{
 		auto self = shared_from_this();
 		asio::ip::tcp::resolver::query query(m_server_url, m_server_port);
-		m_resolver.async_resolve(query, [self, this](const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)
+		m_resolver.async_resolve(query, [self, this](const asio_ec& error, asio::ip::tcp::resolver::iterator iterator)
 								{ handle_resolve(error, iterator); });
 		m_timer.expires_from_now(std::chrono::seconds(m_timeout_seconds));
-		m_timer.async_wait([self, this](const asio::error_code& error)
+		m_timer.async_wait([self, this](const asio_ec& error)
 		{
 			on_timeout(error);
 		});
 	}
 
-	void http_client::handle_resolve(const asio::error_code& error, asio::ip::tcp::resolver::iterator iterator)
+	void http_client::handle_resolve(const asio_ec& error, asio::ip::tcp::resolver::iterator iterator)
 	{
 		if (error)
 		{
@@ -38,11 +38,11 @@ namespace spiritsaway::http_utils
 			return;
 		}
 		auto self = shared_from_this();
-		m_socket.async_connect(*iterator, [self, this](const asio::error_code &err)
+		m_socket.async_connect(*iterator, [self, this](const asio_ec &err)
 							{ handle_connect(err); });
 	}
 
-	void http_client::handle_connect(const asio::error_code &err)
+	void http_client::handle_connect(const asio_ec &err)
 	{
 		if (err)
 		{
@@ -52,10 +52,10 @@ namespace spiritsaway::http_utils
 		}
 
 		auto self = shared_from_this();
-		asio::async_write(m_socket, asio::buffer(m_req_str), [self, this](const asio::error_code &err, std::size_t write_sz)
+		asio::async_write(m_socket, asio::buffer(m_req_str), [self, this](const asio_ec &err, std::size_t write_sz)
 						  { handle_write_request(err); });
 	}
-	void http_client::handle_write_request(const asio::error_code &err)
+	void http_client::handle_write_request(const asio_ec &err)
 	{
 		if (err)
 		{
@@ -63,13 +63,13 @@ namespace spiritsaway::http_utils
 			invoke_callback(err.message());
 			return;
 		}
-		m_socket.async_read_some(asio::buffer(m_content_read_buffer.data(), m_content_read_buffer.size()), [self = shared_from_this(), this](const asio::error_code& err, std::size_t n)
+		m_socket.async_read_some(asio::buffer(m_content_read_buffer.data(), m_content_read_buffer.size()), [self = shared_from_this(), this](const asio_ec& err, std::size_t n)
 		{
 			handle_read_content(err, n);
 		});
 	}
 	
-	void http_client::handle_read_content(const asio::error_code &err, std::size_t n)
+	void http_client::handle_read_content(const asio_ec &err, std::size_t n)
 	{
 		if(err)
 		{
@@ -91,7 +91,7 @@ namespace spiritsaway::http_utils
 			invoke_callback("invalid reply");
 			return;
 		}
-		m_socket.async_read_some(asio::buffer(m_content_read_buffer.data(), m_content_read_buffer.size()),  [self=shared_from_this(), this](const asio::error_code& err, std::size_t bytes_transferred)
+		m_socket.async_read_some(asio::buffer(m_content_read_buffer.data(), m_content_read_buffer.size()),  [self=shared_from_this(), this](const asio_ec& err, std::size_t bytes_transferred)
 		{
 			handle_read_content(err, bytes_transferred);
 		});
@@ -105,7 +105,7 @@ namespace spiritsaway::http_utils
 
 	}
 	
-	void http_client::on_timeout(const asio::error_code& err)
+	void http_client::on_timeout(const asio_ec& err)
 	{
 		if(err != asio::error::operation_aborted)
 		{

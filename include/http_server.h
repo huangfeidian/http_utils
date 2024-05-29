@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <asio.hpp>
+#include <boost/asio.hpp>
 #include <string>
 #include "http_server_session.h"
 #include "http_session_manager.h"
@@ -8,7 +8,8 @@
 
 namespace spiritsaway::http_utils
 {
-
+	namespace asio = boost::asio;
+	using asio_ec = boost::system::error_code;
 	/// The top-level class of the HTTP server.
 	class http_server
 	{

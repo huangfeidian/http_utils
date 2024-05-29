@@ -3,6 +3,8 @@
 #include <vector>
 #include <functional>
 #include <memory>
+#include <cstdint>
+
 namespace spiritsaway::http_utils
 {
 	struct header

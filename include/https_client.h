@@ -5,13 +5,15 @@
 #include <iostream>
 #include <istream>
 #include <ostream>
-#include <asio.hpp>
+#include <boost/asio.hpp>
 #include "http_reply_parser.h"
-#include <asio/ssl.hpp>
+#include <boost/asio/ssl.hpp>
 #include <spdlog/logger.h>
 
 namespace spiritsaway::http_utils
 {
+	namespace asio = boost::asio;
+	using asio_ec = boost::system::error_code;
 	class https_client : public std::enable_shared_from_this<https_client>
 	{
 	private:
@@ -34,13 +36,13 @@ namespace spiritsaway::http_utils
 		void run();
 
 	private:
-		void handle_resolve(const asio::error_code& error, asio::ip::tcp::resolver::results_type results);
-		void handle_connect(const asio::error_code& err, asio::ip::tcp::resolver::results_type::endpoint_type);
-		void handle_hanshake(const asio::error_code& err);
-		void handle_write_request(const asio::error_code& err);
-		void handle_read_content(const asio::error_code& err, std::size_t n);
+		void handle_resolve(const asio_ec& error, asio::ip::tcp::resolver::results_type results);
+		void handle_connect(const asio_ec& err, asio::ip::tcp::resolver::results_type::endpoint_type);
+		void handle_hanshake(const asio_ec& err);
+		void handle_write_request(const asio_ec& err);
+		void handle_read_content(const asio_ec& err, std::size_t n);
 		void invoke_callback(const std::string& err);
-		void on_timeout(const asio::error_code& err);
+		void on_timeout(const asio_ec& err);
 		bool verify_certificate(bool preverified,
 			asio::ssl::verify_context& ctx);
 	};

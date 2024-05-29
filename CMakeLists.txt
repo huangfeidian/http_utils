@@ -2,15 +2,11 @@ cmake_minimum_required(VERSION 3.5)
 
 project(http_utils LANGUAGES CXX)
 
-include_directories(${ASIO_DIR})
 
-add_definitions(-DASIO_STANDALONE)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MSVC)
-add_definitions(-DASIO_MSVC)
-add_definitions(-DBOOST_ASIO_HAS_MOVE)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++latest /bigobj")
 endif(MSVC)
 
@@ -31,12 +27,9 @@ find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 link_directories(${OPENSSL_LIBRARY_DIR})
 
+find_package(Boost 1.71.0 REQUIRED system)
 
-add_definitions (-DBOOST_ASIO_NO_DEPRECATED=1)
-add_definitions (-DBOOST_ASIO_DISABLE_BOOST_ARRAY=1)
-add_definitions (-DBOOST_ASIO_DISABLE_BOOST_BIND=1)
-add_definitions (-DBOOST_ASIO_DISABLE_BOOST_DATE_TIME=1)
-add_definitions (-DBOOST_ASIO_DISABLE_BOOST_REGEX=1)
+INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 
 file(GLOB COMMON_SRC  "${PROJECT_SOURCE_DIR}/src/common/*.cpp" "${PROJECT_SOURCE_DIR}/src/common/*.c")
 add_library(http_common ${COMMON_SRC})
@@ -48,7 +41,7 @@ target_link_libraries(http_client PUBLIC http_common Threads::Threads)
 
 file(GLOB HTTPS_CLIENT_SRC  "${PROJECT_SOURCE_DIR}/src/https_client/*.cpp")
 add_library(https_client ${HTTPS_CLIENT_SRC})
-target_link_libraries(https_client PUBLIC http_common Threads::Threads ${OPENSSL_LIBRARIES})
+target_link_libraries(https_client PUBLIC http_common Threads::Threads ${OPENSSL_LIBRARIES} Boost::system)
 
 file(GLOB HTTP_SERVER_SRC  "${PROJECT_SOURCE_DIR}/src/http_server/*.cpp")
 add_library(http_server ${HTTP_SERVER_SRC})
@@ -57,7 +50,7 @@ target_link_libraries(http_server PUBLIC http_common Threads::Threads)
 
 file(GLOB HTTPS_SERVER_SRC  "${PROJECT_SOURCE_DIR}/src/https_server/*.cpp")
 add_library(https_server ${HTTPS_SERVER_SRC})
-target_link_libraries(https_server PUBLIC http_common Threads::Threads ${OPENSSL_LIBRARIES})
+target_link_libraries(https_server PUBLIC http_common Threads::Threads ${OPENSSL_LIBRARIES} Boost::system)
 
 
 set(TEST_DIR ${PROJECT_SOURCE_DIR}/test/)

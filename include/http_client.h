@@ -5,12 +5,14 @@
 #include <iostream>
 #include <istream>
 #include <ostream>
-#include <asio.hpp>
+#include <boost/asio.hpp>
 #include <spdlog/logger.h>
 #include "http_reply_parser.h"
 
 namespace spiritsaway::http_utils
 {
+	namespace asio = boost::asio;
+	using asio_ec = boost::system::error_code;
 	class http_client : public std::enable_shared_from_this<http_client>
 	{
 	private:
@@ -33,11 +35,11 @@ namespace spiritsaway::http_utils
 		void run();
 
 	private:
-		void handle_resolve(const asio::error_code& err, asio::ip::tcp::resolver::iterator iterator);
-		void handle_connect(const asio::error_code &err);
-		void handle_write_request(const asio::error_code &err);
-		void handle_read_content(const asio::error_code &err, std::size_t n);
+		void handle_resolve(const asio_ec& err, asio::ip::tcp::resolver::iterator iterator);
+		void handle_connect(const asio_ec &err);
+		void handle_write_request(const asio_ec &err);
+		void handle_read_content(const asio_ec &err, std::size_t n);
 		void invoke_callback(const std::string &err);
-		void on_timeout(const asio::error_code &err);
+		void on_timeout(const asio_ec &err);
 	};
 }

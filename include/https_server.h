@@ -1,14 +1,15 @@
 ﻿#pragma once
 
-#include <asio.hpp>
+#include <boost/asio.hpp>
 #include <string>
 #include "https_server_session.h"
 #include <spdlog/logger.h>
-#include <asio/ssl.hpp>
+#include <boost/asio/ssl.hpp>
 
 namespace spiritsaway::http_utils
 {
-
+	namespace asio = boost::asio;
+	using asio_ec = boost::system::error_code;
 	/// The top-level class of the HTTP server.
 	class https_server
 	{

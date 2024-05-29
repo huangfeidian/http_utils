@@ -3,14 +3,16 @@
 
 #include <array>
 #include <memory>
-#include <asio.hpp>
-#include <asio/ssl.hpp>
+#include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 #include "http_request_parser.h"
 #include "http_session_manager.h"
 #include <spdlog/logger.h>
 
 namespace spiritsaway::http_utils
 {
+	namespace asio = boost::asio;
+	using asio_ec = boost::system::error_code;
 	/// Represents a single https_server_session from a client.
 	class https_server_session
 		: public std::enable_shared_from_this<https_server_session>

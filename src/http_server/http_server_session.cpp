@@ -26,7 +26,7 @@ namespace spiritsaway::http_utils {
 	void http_server_session::stop()
 	{
 		m_logger->debug("session {} stop", m_session_idx);
-		asio::error_code ignored_ec;
+		asio_ec ignored_ec;
 		m_socket.shutdown(asio::ip::tcp::socket::shutdown_both,
 			ignored_ec);
 		
@@ -41,7 +41,7 @@ namespace spiritsaway::http_utils {
 			m_session_mgr.stop(self);
 			return;
 		}
-		m_con_timer.async_wait([self, this](const asio::error_code& error)
+		m_con_timer.async_wait([self, this](const asio_ec& error)
 			{
 				if (error != asio::error::operation_aborted)
 				{
@@ -50,7 +50,7 @@ namespace spiritsaway::http_utils {
 				
 			});
 		m_socket.async_read_some(asio::buffer(m_buffer),
-			[this, self](std::error_code ec, std::size_t bytes_transferred)
+			[this, self](asio_ec ec, std::size_t bytes_transferred)
 			{
 				m_con_timer.cancel();
 
@@ -89,7 +89,7 @@ namespace spiritsaway::http_utils {
 			m_session_mgr.stop(self);
 			return;
 		}
-		m_con_timer.async_wait([self, this](const asio::error_code& error)
+		m_con_timer.async_wait([self, this](const asio_ec& error)
 			{
 				if (error != asio::error::operation_aborted)
 				{
@@ -98,7 +98,7 @@ namespace spiritsaway::http_utils {
 			});
 		m_reply_str = m_reply.to_string();
 		asio::async_write(m_socket, asio::buffer(m_reply_str),
-			[this, self](std::error_code ec, std::size_t)
+			[this, self](asio_ec ec, std::size_t)
 			{
 				m_con_timer.cancel();
 				if (!ec)
@@ -142,7 +142,7 @@ namespace spiritsaway::http_utils {
 			m_session_mgr.stop(self);
 			return;
 		}
-		m_con_timer.async_wait([self, this](const asio::error_code& error)
+		m_con_timer.async_wait([self, this](const asio_ec& error)
 			{
 				if (error != asio::error::operation_aborted)
 				{
