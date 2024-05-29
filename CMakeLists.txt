@@ -27,7 +27,7 @@ find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 link_directories(${OPENSSL_LIBRARY_DIR})
 
-find_package(Boost 1.71.0 REQUIRED system)
+find_package(Boost 1.71.0 REQUIRED COMPONENTS  system date_time)
 
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 
@@ -37,20 +37,20 @@ target_link_libraries(http_common PUBLIC spdlog::spdlog)
 
 file(GLOB HTTP_CLIENT_SRC  "${PROJECT_SOURCE_DIR}/src/http_client/*.cpp")
 add_library(http_client ${HTTP_CLIENT_SRC})
-target_link_libraries(http_client PUBLIC http_common Threads::Threads)
+target_link_libraries(http_client PUBLIC http_common Threads::Threads Boost::date_time Boost::system)
 
 file(GLOB HTTPS_CLIENT_SRC  "${PROJECT_SOURCE_DIR}/src/https_client/*.cpp")
 add_library(https_client ${HTTPS_CLIENT_SRC})
-target_link_libraries(https_client PUBLIC http_common Threads::Threads ${OPENSSL_LIBRARIES} Boost::system)
+target_link_libraries(https_client PUBLIC http_client ${OPENSSL_LIBRARIES})
 
 file(GLOB HTTP_SERVER_SRC  "${PROJECT_SOURCE_DIR}/src/http_server/*.cpp")
 add_library(http_server ${HTTP_SERVER_SRC})
-target_link_libraries(http_server PUBLIC http_common Threads::Threads)
+target_link_libraries(http_server PUBLIC http_common Threads::Threads Boost::date_time Boost::system)
 
 
 file(GLOB HTTPS_SERVER_SRC  "${PROJECT_SOURCE_DIR}/src/https_server/*.cpp")
 add_library(https_server ${HTTPS_SERVER_SRC})
-target_link_libraries(https_server PUBLIC http_common Threads::Threads ${OPENSSL_LIBRARIES} Boost::system)
+target_link_libraries(https_server PUBLIC http_server ${OPENSSL_LIBRARIES} )
 
 
 set(TEST_DIR ${PROJECT_SOURCE_DIR}/test/)

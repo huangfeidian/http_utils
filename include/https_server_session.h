@@ -22,7 +22,7 @@ namespace spiritsaway::http_utils
 		https_server_session &operator=(const https_server_session &) = delete;
 
 		/// Construct a https_server_session with the given socket.
-		explicit https_server_session(asio::ssl::stream<asio::ip::tcp::socket> socket, std::shared_ptr<spdlog::logger> in_logger, std::uint64_t in_session_idx, http_session_manager<https_server_session>& session_mgr, const request_handler &handler);
+		explicit https_server_session(std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket>>&& socket, std::shared_ptr<spdlog::logger> in_logger, std::uint64_t in_session_idx, http_session_manager<https_server_session>& session_mgr, const request_handler &handler);
 
 		/// Start the first asynchronous operation for the https_server_session.
 		void start();
@@ -44,7 +44,7 @@ namespace spiritsaway::http_utils
 		void on_timeout(const std::string& reason);
 
 		/// Socket for the https_server_session.
-		asio::ssl::stream<asio::ip::tcp::socket> m_socket;
+		std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket>> m_socket;
 
 		/// The manager for this https_server_session.
 

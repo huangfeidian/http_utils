@@ -6,12 +6,12 @@
 
 namespace spiritsaway::http_utils {
 
-	https_server_session::https_server_session(asio::ssl::stream<asio::ip::tcp::socket> socket, 
+	https_server_session::https_server_session(std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket>>&& socket,
 		std::shared_ptr<spdlog::logger> in_logger, std::uint64_t in_session_idx, http_session_manager<https_server_session>& session_mgr, const request_handler& handler)
 		: m_socket(std::move(socket))
 		, m_session_mgr(session_mgr)
 		, m_request_handler(handler)
-		, m_con_timer(m_socket.get_executor())
+		, m_con_timer(m_socket->get_executor())
 		, m_logger(in_logger)
 		, m_session_idx(in_session_idx)
 	{
@@ -28,7 +28,7 @@ namespace spiritsaway::http_utils {
 		m_logger->debug("session {} stop", m_session_idx);
 		m_con_timer.cancel();
 		asio_ec ignored_ec;
-		m_socket.shutdown(ignored_ec);
+		m_socket->shutdown(ignored_ec);
 		
 	}
 	void https_server_session::do_handshake()
@@ -47,7 +47,7 @@ namespace spiritsaway::http_utils {
 				}
 
 			});
-		m_socket.async_handshake(asio::ssl::stream_base::server, 
+		m_socket->async_handshake(asio::ssl::stream_base::server, 
 			[this, self](const asio_ec& error)
 			{
 				m_con_timer.cancel();
@@ -80,7 +80,7 @@ namespace spiritsaway::http_utils {
 				}
 
 			});
-		m_socket.async_read_some(asio::buffer(m_buffer),
+		m_socket->async_read_some(asio::buffer(m_buffer),
 			[this, self](asio_ec ec, std::size_t bytes_transferred)
 			{
 				m_con_timer.cancel();
@@ -128,7 +128,7 @@ namespace spiritsaway::http_utils {
 				}
 			});
 		m_reply_str = m_reply.to_string();
-		asio::async_write(m_socket, asio::buffer(m_reply_str),
+		asio::async_write(*m_socket, asio::buffer(m_reply_str),
 			[this, self](asio_ec ec, std::size_t)
 			{
 				m_con_timer.cancel();
