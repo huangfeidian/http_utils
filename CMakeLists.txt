@@ -97,7 +97,7 @@ install(TARGETS http_common http_client http_server https_client https_server EX
    LIBRARY DESTINATION lib
   )
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include/${PROJECT_NAME})
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION include/${PROJECT_NAME})
 
 install(EXPORT ${PROJECT_NAME}Targets
 		NAMESPACE http_utils::
