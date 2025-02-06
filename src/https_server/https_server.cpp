@@ -44,7 +44,7 @@ namespace spiritsaway::http_utils
 				if (!ec)
 				{
 					m_session_mgr.start(std::make_shared<https_server_session>(
-						asio::ssl::stream<asio::ip::tcp::socket>(
+						std::make_unique<asio::ssl::stream<asio::ip::tcp::socket>>(
 							std::move(socket), m_ssl_ctx), m_logger, m_session_counter++,
 						m_session_mgr, [this](const request& req, reply_handler rep_cb)
 						{
