@@ -53,6 +53,8 @@ add_library(https_server ${HTTPS_SERVER_SRC})
 target_link_libraries(https_server PUBLIC http_server ${OPENSSL_LIBRARIES} )
 
 
+
+
 set(TEST_DIR ${PROJECT_SOURCE_DIR}/test/)
 
 add_executable(http_client_test ${TEST_DIR}/http_client_test.cpp)
@@ -71,7 +73,13 @@ target_link_libraries(http_server_test http_server)
 add_executable(https_server_test ${TEST_DIR}/https_server_test.cpp)
 target_link_libraries(https_server_test https_server)
 
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  set(IS_TOPLEVEL_PROJECT TRUE)
+else()
+  set(IS_TOPLEVEL_PROJECT FALSE)
+endif()
 
+if(IS_TOPLEVEL_PROJECT)
 
 foreach(p LIB BIN INCLUDE)
 	set(var CMAKE_INSTALL_${p}DIR)
@@ -102,3 +110,4 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION include/${PRO
 install(EXPORT ${PROJECT_NAME}Targets
 		NAMESPACE http_utils::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+endif(IS_TOPLEVEL_PROJECT)
