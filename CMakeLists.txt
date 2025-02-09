@@ -38,6 +38,7 @@ target_link_libraries(http_common PUBLIC spdlog::spdlog)
 file(GLOB HTTP_CLIENT_SRC  "${PROJECT_SOURCE_DIR}/src/http_client/*.cpp")
 add_library(http_client ${HTTP_CLIENT_SRC})
 target_link_libraries(http_client PUBLIC http_common Threads::Threads Boost::date_time Boost::system)
+target_include_directories(http_client INTERFACE $<INSTALL_INTERFACE:include>)
 
 file(GLOB HTTPS_CLIENT_SRC  "${PROJECT_SOURCE_DIR}/src/https_client/*.cpp")
 add_library(https_client ${HTTPS_CLIENT_SRC})
@@ -46,11 +47,13 @@ target_link_libraries(https_client PUBLIC http_client ${OPENSSL_LIBRARIES})
 file(GLOB HTTP_SERVER_SRC  "${PROJECT_SOURCE_DIR}/src/http_server/*.cpp")
 add_library(http_server ${HTTP_SERVER_SRC})
 target_link_libraries(http_server PUBLIC http_common Threads::Threads Boost::date_time Boost::system)
-
+target_include_directories(http_server INTERFACE $<INSTALL_INTERFACE:include>)
 
 file(GLOB HTTPS_SERVER_SRC  "${PROJECT_SOURCE_DIR}/src/https_server/*.cpp")
 add_library(https_server ${HTTPS_SERVER_SRC})
 target_link_libraries(https_server PUBLIC http_server ${OPENSSL_LIBRARIES} )
+
+
 
 
 set(TEST_DIR ${PROJECT_SOURCE_DIR}/test/)
@@ -71,7 +74,13 @@ target_link_libraries(http_server_test http_server)
 add_executable(https_server_test ${TEST_DIR}/https_server_test.cpp)
 target_link_libraries(https_server_test https_server)
 
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  set(IS_TOPLEVEL_PROJECT TRUE)
+else()
+  set(IS_TOPLEVEL_PROJECT FALSE)
+endif()
 
+if(IS_TOPLEVEL_PROJECT)
 
 foreach(p LIB BIN INCLUDE)
 	set(var CMAKE_INSTALL_${p}DIR)
@@ -82,23 +91,24 @@ foreach(p LIB BIN INCLUDE)
 endforeach()
 
 export(TARGETS http_common http_client http_server https_client https_server
-     FILE ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}Targets.cmake)
+     FILE ${CMAKE_BINARY_DIR}/${PROJECT_NAME}Targets.cmake)
 
 file(WRITE
-    ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}Config.cmake
-    "include(\${CMAKE_CURRENT_LIST_DIR}/${CMAKE_PROJECT_NAME}Targets.cmake)\n")
+    ${CMAKE_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+    "include(\${CMAKE_CURRENT_LIST_DIR}/${PROJECT_NAME}Targets.cmake)\n")
 
 install(FILES
-        ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}Config.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${CMAKE_PROJECT_NAME})
+        ${CMAKE_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
 
 install(TARGETS http_common http_client http_server https_client https_server EXPORT ${PROJECT_NAME}Targets
    ARCHIVE  DESTINATION lib
    LIBRARY DESTINATION lib
   )
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include/${PROJECT_NAME})
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION include/${PROJECT_NAME})
 
-install(EXPORT ${CMAKE_PROJECT_NAME}Targets
+install(EXPORT ${PROJECT_NAME}Targets
 		NAMESPACE http_utils::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${CMAKE_PROJECT_NAME})
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+endif(IS_TOPLEVEL_PROJECT)
