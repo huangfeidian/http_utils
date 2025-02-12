@@ -16,6 +16,7 @@ INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/include)
 
 
 # add log support
+find_package(fmt CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 INCLUDE_DIRECTORIES(${spdlog_include_dirs})
 
@@ -33,7 +34,7 @@ INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
 
 file(GLOB COMMON_SRC  "${PROJECT_SOURCE_DIR}/src/common/*.cpp" "${PROJECT_SOURCE_DIR}/src/common/*.c")
 add_library(http_common ${COMMON_SRC})
-target_link_libraries(http_common PUBLIC spdlog::spdlog)
+target_link_libraries(http_common PUBLIC spdlog::spdlog fmt::fmt)
 
 file(GLOB HTTP_CLIENT_SRC  "${PROJECT_SOURCE_DIR}/src/http_client/*.cpp")
 add_library(http_client ${HTTP_CLIENT_SRC})
